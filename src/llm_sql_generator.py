@@ -11,10 +11,18 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-_api_key = os.getenv("OPENAI_API_KEY")
-if not _api_key:
-    raise ValueError("OPENAI_API_KEY not found in environment variables")
-client = OpenAI(api_key=_api_key)
+# Lazy initialization - OpenAI client created on first use
+_client = None
+
+def get_openai_client():
+    """Get or create OpenAI client - Railway compatible"""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 
 _rossman_schema = None
@@ -130,7 +138,7 @@ def generate_sql_query(user_question: str, rossmann_schema: dict = None, validat
     user_prompt = user_template.format(user_question=user_question)
     
     try:
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",  
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -166,7 +174,7 @@ def assess_sql_confidence(user_question: str, generated_sql: str) -> float:
             generated_sql=generated_sql
         )
         
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "user", "content": confidence_prompt}
@@ -209,7 +217,7 @@ def provide_validation_feedback(user_question: str, failed_sql: str, validation_
             **validator_rules  
         )
         
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "user", "content": feedback_prompt}
@@ -226,7 +234,7 @@ def provide_validation_feedback(user_question: str, failed_sql: str, validation_
             # Add this info to the prompt and tr again with more temerature felxiblity
             retry_prompt = feedback_prompt + f"\n\nIMPORTANT: You returned the exact same SQL again: {failed_sql}\nPlease provide a DIFFERENT approach or query structure."
             
-            retry_response = client.chat.completions.create(
+            retry_response = get_openai_client().chat.completions.create(
                 model="gpt-4o-mini", 
                 messages=[
                     {"role": "user", "content": retry_prompt}
