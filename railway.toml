@@ -1,6 +1,6 @@
 [build]
   builder = "DOCKERFILE"
-  dockerfilePath = "Dockerfile.windows"
+  dockerfilePath = "Dockerfile"
 
 [deploy]
   startCommand = "python api_service.py"
