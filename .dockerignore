@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache
+.coverage
+
+# Virtual Environment
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Environment (sensitive!)
+.env
+
+# Backups
+*.backup
+
+# Windows Dockerfile (not for Railway)
+Dockerfile.windows*
+
+# Development files
+requirements-dev.txt
+enhanced_requirements.txt
+README.md
+LICENSE
+
+# Streamlit client (not needed in API container)
+streamlit_client_example.py
+
+# Test files
+*test*.py
+
+# S3 upload scripts (not needed in API)
+src/upload_embeddings_s3.py
+
+# Deployment scripts
+deploy-*.ps1
+start-*.ps1
+docker-compose*.yml

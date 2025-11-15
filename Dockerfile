@@ -31,9 +31,9 @@ USER app
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Railway sets PORT automatically, fallback to 8000
+# Railway sets PORT automatically
 ENV PORT=8000
-EXPOSE $PORT
+EXPOSE 8000
 
-# Start the API service
-CMD ["python", "-m", "uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
+# Start the API service - api_service.py handles PORT from environment
+CMD ["python", "api_service.py"]
