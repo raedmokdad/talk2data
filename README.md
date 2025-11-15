@@ -120,17 +120,5 @@ Get: `SELECT AVG(sales) FROM rossmann_data WHERE store = 123`
 - Validates SQL so nothing dangerous runs
 - Has retry logic when AI messes up
 
-## Issues or ideas?
 
-Just open an issue on GitHub or send me a message. I built this as a learning project so it's not perfect but it works pretty well!
-
-## Want to help?
-
-Sure! Fork it, make it better, send a pull request. No fancy process needed.
-
-## License
-
-MIT - do whatever you want with it
----
-
-Made by Raed Mokdad as a fun project to learn about AI and SQL. Hope you find it useful!
+Made by Raed Mokdad. Hope you find it useful!
