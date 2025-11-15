@@ -1,0 +1,3 @@
+USER QUESTION: {user_question}
+
+SQL Query:

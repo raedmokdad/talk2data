@@ -1,0 +1,17 @@
+{
+            "table": "rossmann_result",
+            "columns": {
+                "store": "INTEGER - Store ID (1-1115)",
+                "date": "DATE - Sales date (2013-2015)",
+                "actual_sales": "FLOAT - Real sales amount in EUR",
+                "forecast_sales": "FLOAT - Predicted sales amount in EUR",
+                "promo_flag": "INTEGER - 1=promotion active, 0=no promotion",
+                "mape": "FLOAT - Mean Absolute Percentage Error (forecast accuracy)"
+            },
+            "notes": [
+                "Use date() function for date comparisons",
+                "Always include LIMIT clause for large results",
+                "Store numbers range from 1 to 1115",
+                "Date range: 2013-01-01 to 2015-12-31"
+            ]
+        }

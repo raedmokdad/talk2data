@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  talk2data-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.windows
+    container_name: talk2data-agent
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .\logs:C:\app\logs
+      - .\data:C:\app\data
+    restart: unless-stopped
+    networks:
+      - talk2data-network
+    healthcheck:
+      test: ["CMD", "powershell", "-command", "Invoke-RestMethod http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Redis for caching (if needed later)
+  redis:
+    image: redis:nanoserver
+    container_name: talk2data-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - talk2data-network
+
+networks:
+  talk2data-network:
+    driver: bridge
+
+volumes:
+  logs:
+  data:
