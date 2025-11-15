@@ -5,9 +5,13 @@ import os
 import time
 import logging
 from typing import Optional
+from pathlib import Path
 
-# Add src to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+# Add src to Python path - robust for Railway
+current_dir = Path(__file__).parent
+src_path = current_dir / 'src'
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
 from llm_sql_generator import generate_sql_with_validation, load_rossmann_schema
 from sql_validator import SQLValidator
