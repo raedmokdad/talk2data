@@ -1,0 +1,36 @@
+# Railway Streamlit Frontend Dockerfile
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY auth_service.py .
+COPY streamlit_app_auth.py .
+COPY .streamlit /app/.streamlit
+
+# Create non-root user
+RUN useradd -m -u 1000 streamlit && chown -R streamlit:streamlit /app
+USER streamlit
+
+# Expose port (Railway sets PORT dynamically)
+EXPOSE 8501
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:$PORT/_stcore/health || exit 1
+
+# Start Streamlit
+CMD ["sh", "-c", "streamlit run streamlit_app_auth.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"]
