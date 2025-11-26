@@ -2,9 +2,18 @@ from dotenv import load_dotenv, dotenv_values
 import os
 import logging
 import pathlib
+import sys
 
-from llm_sql_generator import generate_sql_with_validation, load_rossmann_schema
-from sql_validator import SQLValidator
+# Add parent directory to path so imports work from anywhere
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
+try:
+    from src.llm_sql_generator import generate_multi_table_sql
+    from src.sql_validator import SQLValidator
+except ModuleNotFoundError:
+    # Fallback for when running from src/ directory
+    from llm_sql_generator import generate_multi_table_sql
+    from sql_validator import SQLValidator
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -33,15 +42,10 @@ def main():
         
         print(f"\nProcessing: {user_text}")
         
-        # Direct SQL Generation 
-        schema = load_rossmann_schema()
-        validator = SQLValidator(schema)
-        
-        sql_query, confidence, validation_passed = generate_sql_with_validation(
+        # Multi-Table SQL Generation with automatic table selection and JOINs
+        sql_query = generate_multi_table_sql(
             user_question=user_text,
-            validator=validator,
-            max_retries=3,
-            confidence_threshold=0.7
+            schema_name="retial_star_schema"
         )
         
         # Show Results
@@ -49,15 +53,7 @@ def main():
         print("GENERATED SQL QUERY:")
         print("="*60)
         print(f"```sql\n{sql_query}\n```")
-        print(f"\nConfidence: {confidence:.2f}")
-        print(f"Validation: {'PASSED' if validation_passed else 'FAILED'}")
-        
-        if confidence >= 0.8:
-            print("Quality: Excellent - Ready for execution")
-        elif confidence >= 0.6:
-            print("Quality: Good - Review recommended")
-        else:
-            print("Quality: Low - Manual review required")
+        print("\n✓ Multi-table query with automatic JOINs generated successfully")
             
         return 0
         

@@ -1,0 +1,267 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_sales",
+        "role": "fact",
+        "grain": "one row per store, product and day",
+        "columns": {
+          "sales_id": "BIGINT - Surrogate key for the fact row",
+          "date_key": "INT - Foreign key to dim_date.date_key",
+          "store_key": "INT - Foreign key to dim_store.store_key",
+          "product_key": "INT - Foreign key to dim_product.product_key",
+          "sales_amount": "DECIMAL(12,2) - Gross sales amount in EUR",
+          "sales_quantity": "INT - Number of items sold",
+          "discount_amount": "DECIMAL(12,2) - Total discount amount in EUR",
+          "return_flag": "BOOLEAN - TRUE if this row represents a return/refund"
+        },
+        "primary_key": "sales_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "store_key": "dim_store.store_key",
+          "product_key": "dim_product.product_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per calendar date",
+        "columns": {
+          "date_key": "INT - Surrogate key, e.g. 20240131",
+          "date": "DATE - Calendar date",
+          "year": "INT - Calendar year, e.g. 2024",
+          "quarter": "INT - Quarter of year (1-4)",
+          "month": "INT - Month number (1-12)",
+          "month_name": "VARCHAR - Month name, e.g. 'January'",
+          "week_of_year": "INT - ISO week number (1-53)",
+          "day_of_month": "INT - Day of month (1-31)",
+          "day_name": "VARCHAR - Day name, e.g. 'Monday'",
+          "is_holiday": "BOOLEAN - TRUE if public holiday in main market"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_store",
+        "role": "dimension",
+        "grain": "one row per physical store",
+        "columns": {
+          "store_key": "INT - Surrogate key of the store",
+          "store_id": "INT - Business store ID",
+          "store_name": "VARCHAR - Human readable store name",
+          "region": "VARCHAR - Sales region, e.g. 'North', 'South'",
+          "country": "VARCHAR - Country, e.g. 'Germany'",
+          "city": "VARCHAR - City name",
+          "store_type": "VARCHAR - Type, e.g. 'Flagship', 'Mall', 'Outlet'",
+          "open_date": "DATE - Date the store opened",
+          "close_date": "DATE - Date the store closed (NULL if still open)"
+        },
+        "primary_key": "store_key"
+      },
+      {
+        "name": "dim_product",
+        "role": "dimension",
+        "grain": "one row per product SKU",
+        "columns": {
+          "product_key": "INT - Surrogate key of the product",
+          "sku": "VARCHAR - Business SKU or article number",
+          "product_name": "VARCHAR - Product name",
+          "brand": "VARCHAR - Brand name",
+          "category": "VARCHAR - Main category, e.g. 'Beverages'",
+          "subcategory": "VARCHAR - Subcategory, e.g. 'Soft drinks'",
+          "is_active": "BOOLEAN - TRUE if actively sold",
+          "launch_date": "DATE - Product launch date"
+        },
+        "primary_key": "product_key"
+      }
+    ],
+    "notes": [
+      "This is a star schema: fact_sales links to dim_date, dim_store and dim_product.",
+      "All analytical queries should read from fact_sales and join the needed dimensions.",
+      "Use DATE_TRUNC on dim_date.date for monthly or weekly aggregations.",
+      "Always include a LIMIT clause for large result sets."
+    ],
+
+    "relationships": [
+      {
+        "from": "fact_sales.date_key",
+        "to": "dim_date.date_key",
+        "join_type": "LEFT JOIN",
+        "description": "Links sales transactions to calendar date dimension"
+      },
+      {
+        "from": "fact_sales.store_key",
+        "to": "dim_store.store_key",
+        "join_type": "LEFT JOIN",
+        "description": "Links sales transactions to store dimension"
+      },
+      {
+        "from": "fact_sales.product_key",
+        "to": "dim_product.product_key",
+        "join_type": "LEFT JOIN",
+        "description": "Links sales transactions to product dimension"
+      }
+    ]
+  },
+
+  "synonyms": {
+    "umsatz": {
+      "column": "sales_amount",
+      "table": "fact_sales",
+      "description": "Gross sales amount"
+    },
+    "verkaufsumsatz": {
+      "column": "sales_amount",
+      "table": "fact_sales",
+      "description": "Gross sales amount"
+    },
+    "absatz": {
+      "column": "sales_quantity",
+      "table": "fact_sales",
+      "description": "Number of items sold"
+    },
+    "stückzahl": {
+      "column": "sales_quantity",
+      "table": "fact_sales",
+      "description": "Number of items sold"
+    },
+    "rabatt": {
+      "column": "discount_amount",
+      "table": "fact_sales",
+      "description": "Discount amount"
+    },
+    "nachlass": {
+      "column": "discount_amount",
+      "table": "fact_sales",
+      "description": "Discount amount"
+    },
+    "retoure": {
+      "column": "return_flag",
+      "table": "fact_sales",
+      "description": "Return/refund flag"
+    },
+    "rückgabe": {
+      "column": "return_flag",
+      "table": "fact_sales",
+      "description": "Return/refund flag"
+    },
+    "filiale": {
+      "column": "store_name",
+      "table": "dim_store",
+      "description": "Store name"
+    },
+    "geschäft": {
+      "column": "store_name",
+      "table": "dim_store",
+      "description": "Store name"
+    },
+    "region": {
+      "column": "region",
+      "table": "dim_store",
+      "description": "Sales region"
+    },
+    "produkt": {
+      "column": "product_name",
+      "table": "dim_product",
+      "description": "Product name"
+    },
+    "artikelnummer": {
+      "column": "sku",
+      "table": "dim_product",
+      "description": "Product SKU"
+    },
+    "produktname": {
+      "column": "product_name",
+      "table": "dim_product",
+      "description": "Product name"
+    },
+    "kategorie": {
+      "column": "category",
+      "table": "dim_product",
+      "description": "Product category"
+    }
+  },
+
+  "kpis": {
+    "net_sales": {
+      "formula": "SUM(fact_sales.sales_amount - fact_sales.discount_amount)",
+      "description": "Total sales after discounts",
+      "required_tables": ["fact_sales"],
+      "keywords": ["nettoumsatz", "netto", "bereinigter umsatz"]
+    },
+    "gross_sales": {
+      "formula": "SUM(fact_sales.sales_amount)",
+      "description": "Total sales before discounts",
+      "required_tables": ["fact_sales"],
+      "keywords": ["bruttoumsatz", "brutto", "gesamtumsatz"]
+    },
+    "average_discount_rate": {
+      "formula": "SUM(fact_sales.discount_amount) / NULLIF(SUM(fact_sales.sales_amount), 0)",
+      "description": "Average discount percentage",
+      "required_tables": ["fact_sales"],
+      "keywords": ["rabattrate", "durchschnittlicher rabatt"]
+    },
+    "items_per_transaction": {
+      "formula": "SUM(fact_sales.sales_quantity) / COUNT(DISTINCT fact_sales.sales_id)",
+      "description": "Average items per sale",
+      "required_tables": ["fact_sales"],
+      "keywords": ["artikel pro verkauf", "durchschnittliche stückzahl"]
+    },
+    "revenue_per_store": {
+      "formula": "SUM(fact_sales.sales_amount)",
+      "group_by": "dim_store.store_name",
+      "description": "Sales grouped by store",
+      "required_tables": ["fact_sales", "dim_store"],
+      "keywords": ["umsatz pro filiale", "filialumsatz"]
+    },
+    "revenue_per_region": {
+      "formula": "SUM(fact_sales.sales_amount)",
+      "group_by": "dim_store.region",
+      "description": "Sales grouped by region",
+      "required_tables": ["fact_sales", "dim_store"],
+      "keywords": ["umsatz pro region", "regionalumsatz"]
+    },
+    "monthly_sales_trend": {
+      "formula": "SUM(fact_sales.sales_amount)",
+      "group_by": "DATE_TRUNC('month', dim_date.date)",
+      "description": "Monthly sales trend",
+      "required_tables": ["fact_sales", "dim_date"],
+      "keywords": ["monatlicher umsatz", "umsatztrend", "monatstrend"]
+    },
+    "return_rate": {
+      "formula": "SUM(CASE WHEN fact_sales.return_flag = TRUE THEN fact_sales.sales_amount ELSE 0 END) / NULLIF(SUM(fact_sales.sales_amount), 0)",
+      "description": "Percentage of returned sales",
+      "required_tables": ["fact_sales"],
+      "keywords": ["retourenquote", "rücksendungsrate", "rückgabequote"]
+    }
+  },
+
+  "examples": [
+    {
+      "description": "Monthly net sales by region",
+      "pattern": "SELECT DATE_TRUNC('month', d.date) AS month, s.region, SUM(f.sales_amount - f.discount_amount) AS net_sales FROM fact_sales f JOIN dim_date d ON f.date_key = d.date_key JOIN dim_store s ON f.store_key = s.store_key GROUP BY month, s.region ORDER BY month, s.region;"
+    },
+    {
+      "description": "Top 10 products by sales amount in the last 90 days",
+      "pattern": "SELECT p.product_name, SUM(f.sales_amount) AS total_sales FROM fact_sales f JOIN dim_date d ON f.date_key = d.date_key JOIN dim_product p ON f.product_key = p.product_key WHERE d.date >= CURRENT_DATE - INTERVAL '90 days' GROUP BY p.product_name ORDER BY total_sales DESC LIMIT 10;"
+    },
+    {
+      "description": "Average discount rate by store type",
+      "pattern": "SELECT s.store_type, SUM(f.discount_amount) / NULLIF(SUM(f.sales_amount), 0) AS avg_discount_rate FROM fact_sales f JOIN dim_store s ON f.store_key = s.store_key GROUP BY s.store_type;"
+    },
+    {
+      "description": "Return rate per month",
+      "pattern": "SELECT DATE_TRUNC('month', d.date) AS month, SUM(CASE WHEN f.return_flag = TRUE THEN f.sales_amount ELSE 0 END) / NULLIF(SUM(f.sales_amount), 0) AS return_rate FROM fact_sales f JOIN dim_date d ON f.date_key = d.date_key GROUP BY month ORDER BY month;"
+    }
+  ],
+
+  "glossary": {
+    "fact_sales": "Fact table that stores daily sales transactions at store-product-date grain.",
+    "dim_date": "Date dimension with calendar attributes for reporting.",
+    "dim_store": "Store dimension that describes each physical store and its location.",
+    "dim_product": "Product dimension that describes each product SKU.",
+    "net_sales": "Sales after subtracting discounts and returns.",
+    "gross_sales": "Total sales before discounts and returns.",
+    "return_rate": "Share of sales that were returned or refunded.",
+    "average_discount_rate": "Average ratio of discount_amount to sales_amount over a selected period."
+  }
+}

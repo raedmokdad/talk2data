@@ -3,8 +3,10 @@ import os
 import json
 import pathlib
 from dotenv import load_dotenv
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 import logging
+from src.schema_parser import get_schema_parser
+from src.date_converter import extract_and_convert_dates
 
 logger = logging.getLogger(__name__)
 
@@ -297,3 +299,129 @@ def generate_sql_with_validation(user_question: str, validator, rossmann_schema:
                 return sql_query, confidence_score, True  # Validation passed but low confidence
     
     return sql_query, confidence_score, validation_passed
+
+
+def generate_multi_table_sql(user_question: str, schema_name: str = "retial_star_schema", validator=None) -> str:
+    """
+    Generates SQL query with automatic table selection and JOIN generation.
+    
+    This function:
+    1. Uses LLM to identify relevant tables for the question
+    2. Algorithmically generates JOINs between selected tables
+    3. Builds comprehensive schema info including JOIN paths
+    4. Calls LLM to generate complete SQL with proper JOINs
+    
+    Args:
+        user_question: Natural language question from user
+        schema_name: Name of the star schema to use (default: "retial_star_schema")
+        validator: Optional SQL validator for security checks
+    
+    Returns:
+        Generated SQL query string with JOINs
+    """
+    try:
+        # 0. Preprocess: Convert dates to ISO format
+        processed_question = extract_and_convert_dates(user_question)
+        if processed_question != user_question:
+            logger.info(f"Date conversion applied:\nOriginal: {user_question}\nProcessed: {processed_question}")
+        
+        # 1. Load schema via singleton
+        parser = get_schema_parser(schema_name)
+        
+        # 2. Get relevant tables (LLM decides which tables needed)
+        relevant_tables = parser.get_relevant_tables(processed_question)
+        logger.info(f"Selected tables: {relevant_tables}")
+        
+        if not relevant_tables:
+            raise ValueError("No relevant tables identified for the question")
+        
+        # 3. Find JOIN path (algorithm generates JOINs)
+        join_path = parser.find_join_path(relevant_tables)
+        
+        if join_path is None and len(relevant_tables) > 1:
+            logger.error(f"Could not find JOIN path for tables: {relevant_tables}")
+            raise ValueError("Unable to connect selected tables with JOINs")
+        
+        # 4. Build schema information for LLM
+        # Get detailed info for each selected table
+        tables_info = []
+        for table_name in relevant_tables:
+            table_data = parser.tables.get(table_name, {})
+            role = table_data.get("role", "")
+            grain = table_data.get("grain", "")
+            columns = table_data.get("columns", {})
+            
+            col_descriptions = "\n".join([f"  - {col}: {desc}" for col, desc in columns.items()])
+            table_info = f"Table: {table_name} ({role})\n- Grain: {grain}\n- Columns:\n{col_descriptions}"
+            tables_info.append(table_info)
+        
+        schema_info = "\n\n".join(tables_info)
+        
+        # 5. Build JOIN SQL
+        join_sql = ""
+        if join_path and join_path.relationships:
+            join_sql = join_path.to_sql()
+            logger.info(f"Generated JOINs:\n{join_sql}")
+        
+        # 6. Get validator rules
+        validator_rules = {}
+        if validator:
+            validator_rules = extract_validator_rules(validator)
+        else:
+            validator_rules = {
+                "forbidden_commands": "INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, MERGE, REPLACE, EXEC, CALL, GRANT, REVOKE",
+                "allowed_functions": "SUM, AVG, COUNT, MIN, MAX, DATE, DATE_TRUNC, COALESCE, YEAR, MONTH",
+                "dangerous_patterns": "Comments, SQL injection patterns, Command chaining, UNION operations"
+            }
+        
+        # 7. Build prompt for LLM
+        system_prompt = f"""You are an expert SQL query generator for a star schema database.
+
+Available Tables and Schema:
+{schema_info}
+
+JOIN Structure:
+The tables are connected with the following JOINs:
+{join_sql if join_sql else "Single table query - no JOINs needed"}
+
+Security Rules:
+- FORBIDDEN commands: {validator_rules['forbidden_commands']}
+- ALLOWED functions: {validator_rules['allowed_functions']}
+- AVOID: {validator_rules['dangerous_patterns']}
+
+Instructions:
+1. Use the provided JOIN structure in your FROM clause
+2. Generate a complete, valid SQL query
+3. Use only the columns available in the schema above
+4. Follow proper SQL syntax and best practices
+5. For date filters, use the ISO format dates provided in the question
+6. Return ONLY the SQL query, no explanations
+"""
+        
+        user_prompt = f"Generate a SQL query to answer this question: {processed_question}"
+        
+        # 8. Call LLM
+        response = get_openai_client().chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0,
+            max_tokens=800
+        )
+        
+        sql_query = response.choices[0].message.content.strip()
+        
+        # 9. Clean up SQL formatting
+        if sql_query.startswith("```sql"):
+            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
+        if sql_query.startswith("```"):
+            sql_query = sql_query.replace("```", "").strip()
+        
+        logger.info(f"Generated SQL:\n{sql_query}")
+        return sql_query
+        
+    except Exception as e:
+        logger.error(f"Multi-table SQL generation failed: {e}")
+        raise

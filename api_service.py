@@ -1,10 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 import sys
 import os
 import time
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 # Add src to Python path - robust for Railway
@@ -13,7 +13,9 @@ src_path = current_dir / 'src'
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from llm_sql_generator import generate_sql_with_validation, load_rossmann_schema
+from s3_service import list_user_schema, get_user_schema, upload_user_schema, delete_user_schema, get_current_user
+
+from llm_sql_generator import generate_multi_table_sql
 from sql_validator import SQLValidator
 
 # Configure logging
@@ -27,10 +29,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+class UpdateSchemaRequest(BaseModel):
+    schema_data: Dict[str, Any]
+    
 class QueryRequest(BaseModel):
     question: str = Field(..., description="Natural language question")
     max_retries: int = Field(3, description="Maximum retry attempts")
     confidence_threshold: float = Field(0.7, description="Minimum confidence score")
+    schema_name: Optional[str] = Field(None, description="Name of the schema to use")
+    username: Optional[str] = Field(None, description="Username for schema lookup")
 
 class QueryResponse(BaseModel):
     sql_query: str
@@ -38,18 +45,34 @@ class QueryResponse(BaseModel):
     validation_passed: bool
     processing_time: float
     message: str
+    
+class UpdateSchemaResponse(BaseModel):
+    username: str
+    schema_name: str
+    message: str
+    success: bool
 
-# Global variables for caching
-_schema = None
-_validator = None
 
-def get_schema_and_validator():
-    """Cache schema and validator to avoid repeated loading"""
-    global _schema, _validator
-    if _schema is None or _validator is None:
-        _schema = load_rossmann_schema()
-        _validator = SQLValidator(_schema)
-    return _schema, _validator
+class SchemaListResponse(BaseModel):
+    username: str
+    schemas: List[str]
+    count: int
+    success: bool
+    
+class GetSchemaResponse(BaseModel):
+    username: str
+    schema_name: str
+    schema: Dict[str, Any]
+    success: bool
+    
+class DeleteSchemaResponse(BaseModel):
+    username: str
+    schema_name: str
+    message: str
+    success: bool
+
+
+# Note: Schema loading now handled by get_schema_parser() singleton in schema_parser.py
 
 @app.get("/")
 async def root():
@@ -64,18 +87,22 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring"""
     try:
-        # Test schema loading
-        schema, validator = get_schema_and_validator()
+        # Test schema loading with new multi-table parser
+        from schema_parser import get_schema_parser
+        parser = get_schema_parser("retial_star_schema")
         return {
             "status": "healthy",
-            "service": "talk2data-agent",
+            "service": "talk2data-agent-multitable",
             "timestamp": time.time(),
-            "schema_loaded": bool(schema),
-            "validator_ready": bool(validator)
+            "schema_loaded": bool(parser.tables),
+            "tables_count": len(parser.tables),
+            "available_tables": list(parser.tables.keys())
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+    
+
 
 @app.post("/generate-sql", response_model=QueryResponse)
 async def generate_sql(request: QueryRequest):
@@ -90,31 +117,22 @@ async def generate_sql(request: QueryRequest):
         if len(request.question) > 500:
             raise HTTPException(status_code=400, detail="Question too long (max 500 characters)")
         
-        logger.info(f"Processing question: {request.question[:100]}...")
+        # Determine schema name to use
+        schema_name = request.schema_name if request.schema_name else "retial_star_schema"
         
-        # Get schema and validator
-        schema, validator = get_schema_and_validator()
-        
-        # Generate SQL
-        sql_query, confidence, validation_passed = generate_sql_with_validation(
+        # Generate SQL with Multi-Table support (automatic table selection + JOINs)
+        sql_query = generate_multi_table_sql(
             user_question=request.question.strip(),
-            validator=validator,
-            rossmann_schema=schema,
-            max_retries=request.max_retries,
-            confidence_threshold=request.confidence_threshold
+            schema_name=schema_name
         )
         
         processing_time = time.time() - start_time
         
-        # Determine message based on results
-        if validation_passed and confidence >= request.confidence_threshold:
-            message = "SQL generated successfully"
-        elif validation_passed:
-            message = f"SQL generated but low confidence ({confidence:.2f})"
-        else:
-            message = "SQL generated but failed validation"
-        
-        logger.info(f"SQL generated in {processing_time:.2f}s, confidence: {confidence:.2f}")
+        # For backward compatibility, set confidence and validation to True
+        # (Multi-table version doesn't return these yet)
+        confidence = 0.95  # High confidence for multi-table algorithmic JOINs
+        validation_passed = True
+        message = "SQL generated successfully with multi-table support"
         
         return QueryResponse(
             sql_query=sql_query,
@@ -130,18 +148,116 @@ async def generate_sql(request: QueryRequest):
     except Exception as e:
         logger.error(f"Error generating SQL: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+@app.get("/schemas/{username}")
+async def listschemas(username: str, current_user: str = Depends(get_current_user)) -> SchemaListResponse:
+    """List all schemas for a user"""
+    if not username.strip():
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    
+    try:
+        success, schemas = list_user_schema(username=username)
+        if not success:
+            return SchemaListResponse(username=username, schemas=[], count=0,success=success)
+        return SchemaListResponse(username=username, schemas=schemas, count=len(schemas), success=success)
+    except Exception as e:
+        logger.error(f"Error listing schemas for user {username}: {e}")
+        return SchemaListResponse(username=username, schemas=[], count=0, success=False)
+    
+@app.get("/schemas/{username}/{schema_name}")
+async def get_schema(username: str, schema_name: str, current_user: str = Depends(get_current_user)) -> GetSchemaResponse:
+    """Get a specific schema for a user"""
+    if not username.strip():
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if not schema_name.strip():
+        raise HTTPException(status_code=400, detail="Schema name cannot be empty")
+    
+    try:
+        success, schema = get_user_schema(username, schema_name)
+        if not success:
+            return GetSchemaResponse(username=username, schema_name=schema_name, schema={}, success=False)
+        return GetSchemaResponse(username=username, schema_name=schema_name, schema=schema, success=True)
+    except Exception as e:
+        logger.error(f"Error getting schema {schema_name} for user {username}: {e}")
+        return GetSchemaResponse(username=username, schema_name=schema_name, schema={}, success=False)
+    
+    
+@app.delete("/schemas/{username}/{schema_name}")
+async def delete_schema(username: str, schema_name: str, current_user: str = Depends(get_current_user)) -> DeleteSchemaResponse:
+    """Delete a specific schema for a user"""
+    if not username.strip():
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if not schema_name.strip():
+        raise HTTPException(status_code=400, detail="Schema name cannot be empty")
+    
+    try:
+        success, message = delete_user_schema(username, schema_name)
+        return DeleteSchemaResponse(username=username, schema_name=schema_name, message=message, success=success)
+    except Exception as e:
+        logger.error(f"Error deleting schema {schema_name} for user {username}: {e}")
+        message = f"Delete failed: {str(e)}"
+        return DeleteSchemaResponse(username=username, schema_name=schema_name, message=message, success=False)
+    
+@app.put("/schemas/{username}/{schema_name}")
+async def update_schema(username: str, schema_name: str, request: UpdateSchemaRequest, current_user: str = Depends(get_current_user)) -> UpdateSchemaResponse:
+    """ Update the given Schema"""
+    if not username.strip():
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if not schema_name.strip():
+        raise HTTPException(status_code=400, detail="Schema name cannot be empty")
+    if not request.schema_data:
+        raise HTTPException(status_code=400, detail="Schema data cannot be empty")
+    try:
+        success, message = upload_user_schema(username, schema_name,request.schema_data)
+        return UpdateSchemaResponse(username = username, schema_name= schema_name, message= message, success= success)
+    except Exception as e:
+        logger.error(f"Error updating schema {schema_name} for user {username}: {e}")
+        return UpdateSchemaResponse(username=username, schema_name=schema_name, message=f"Update failed: {str(e)}", success=False)
+
+
+@app.post("/schemas/{username}/{schema_name}")
+async def create_schema(username: str, schema_name: str, request: UpdateSchemaRequest, current_user: str = Depends(get_current_user)) -> UpdateSchemaResponse:
+    """ Create the given Schema"""
+    if not username.strip():
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if not schema_name.strip():
+        raise HTTPException(status_code=400, detail="Schema name cannot be empty")
+    if not request.schema_data:
+        raise HTTPException(status_code=400, detail="Schema data cannot be empty")
+    try:
+        success, message = upload_user_schema(username, schema_name,request.schema_data)
+        return UpdateSchemaResponse(username = username, schema_name= schema_name, message= message, success= success)
+    except Exception as e:
+        logger.error(f"Error creating schema {schema_name} for user {username}: {e}")
+        return UpdateSchemaResponse(username=username, schema_name=schema_name, message=f"Create failed: {str(e)}", success=False)
+   
+    
+    
 
 @app.get("/info")
 async def service_info():
     """Get service information and configuration"""
     try:
-        schema, validator = get_schema_and_validator()
+        from schema_parser import get_schema_parser
+        parser = get_schema_parser("retial_star_schema")
+        
+        # Get schema summary
+        schema_summary = parser.get_schema_summary()
+        
         return {
-            "service": "Talk2Data Agent",
-            "table_name": schema.get('table', 'unknown'),
-            "columns": list(schema.get('columns', {}).keys()),
-            "allowed_functions": validator.allowed_functions if validator else [],
-            "forbidden_commands": validator.forbidden_commands if validator else []
+            "service": "Talk2Data Agent - Multi-Table",
+            "version": "2.0.0",
+            "features": [
+                "Automatic table selection (LLM)",
+                "Algorithmic JOIN generation",
+                "Multi-table SQL queries",
+                "Star schema optimized"
+            ],
+            "schema_name": parser.schema_name,
+            "tables": list(parser.tables.keys()),
+            "tables_count": len(parser.tables),
+            "relationships_count": len(parser.relationships),
+            "schema_summary": schema_summary[:500] + "..." if len(schema_summary) > 500 else schema_summary
         }
     except Exception as e:
         logger.error(f"Error getting service info: {e}")

@@ -1,0 +1,24 @@
+{
+    "table": "ecommerce_orders",
+    "columns": {
+        "order_id": "INTEGER - Unique order identifier",
+        "customer_id": "INTEGER - Customer ID (foreign key)",
+        "order_date": "DATE - When the order was placed",
+        "product_name": "VARCHAR(200) - Name of the product",
+        "category": "VARCHAR(100) - Product category (Electronics, Clothing, Books, etc.)",
+        "quantity": "INTEGER - Number of items ordered",
+        "unit_price": "DECIMAL(10,2) - Price per item in EUR",
+        "total_amount": "DECIMAL(10,2) - Total order value (quantity * unit_price)",
+        "payment_method": "VARCHAR(50) - Payment type (Credit Card, PayPal, Bank Transfer)",
+        "shipping_country": "VARCHAR(100) - Destination country",
+        "order_status": "VARCHAR(50) - Status (Pending, Shipped, Delivered, Cancelled)"
+    },
+    "notes": [
+        "Use date() function for date comparisons",
+        "Always include LIMIT clause for large results",
+        "Order dates range from 2020-01-01 onwards",
+        "Total amount is always quantity * unit_price",
+        "Categories: Electronics, Clothing, Books, Home & Garden, Sports",
+        "Valid statuses: Pending, Shipped, Delivered, Cancelled"
+    ]
+}

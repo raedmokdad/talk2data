@@ -1,0 +1,27 @@
+{
+    "table": "sales_analytics",
+    "columns": {
+        "sale_id": "INTEGER - Unique sale transaction ID",
+        "transaction_date": "DATETIME - Date and time of sale",
+        "store_id": "INTEGER - Store identifier (1-500)",
+        "product_id": "INTEGER - Product identifier",
+        "product_category": "VARCHAR(100) - Product category",
+        "customer_segment": "VARCHAR(50) - Customer type (B2B, B2C, Wholesale)",
+        "sales_amount": "DECIMAL(12,2) - Total sales value in USD",
+        "discount_percentage": "DECIMAL(5,2) - Discount applied (0-100)",
+        "profit_margin": "DECIMAL(5,2) - Profit margin percentage",
+        "units_sold": "INTEGER - Number of units sold",
+        "payment_type": "VARCHAR(50) - Payment method used",
+        "region": "VARCHAR(100) - Geographic region (North, South, East, West, Central)"
+    },
+    "notes": [
+        "Use datetime() or date() for date/time comparisons",
+        "Always include LIMIT clause for large results",
+        "Transaction dates from 2018-01-01 to present",
+        "Store IDs range from 1 to 500",
+        "Regions: North, South, East, West, Central",
+        "Customer segments: B2B, B2C, Wholesale",
+        "Discount percentage is 0-100 (0 = no discount)",
+        "For revenue calculations: sales_amount * (1 - discount_percentage/100)"
+    ]
+}

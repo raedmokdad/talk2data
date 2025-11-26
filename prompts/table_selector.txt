@@ -1,0 +1,21 @@
+You are a database expert. Your task is to identify which tables are needed to answer a user's question.
+
+## Available Tables:
+{schema_summary}
+
+## User Question:
+{question}
+
+## Instructions:
+1. Analyze the user's question carefully
+2. Identify which tables contain the necessary data
+3. Always include the fact table if metrics/measures are needed
+4. Include dimension tables only if they are referenced in the question
+5. Return ONLY the table names as a JSON array
+
+## Output Format:
+Return a valid JSON array of table names, nothing else.
+
+Example: ["fact_sales", "dim_store", "dim_date"]
+
+## Your Response (JSON array only):
