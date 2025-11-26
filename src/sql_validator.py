@@ -4,10 +4,8 @@ from typing import Dict, Any
 class SQLValidator:
     """Validates SQL queries and returns error messages"""
     
-    def __init__(self, schema: Dict[str,Any]):
-        self.schema = schema 
-        self.table = schema['table']
-        self.columns = schema['columns'].keys()
+    def __init__(self, schema: Dict[str,Any] = None):
+        self.schema = schema  # Optional - only used for security checks
         
         self.pattern_labels = {
             r";\s*(DROP|DELETE|UPDATE|ALTER|INSERT)": 
@@ -43,9 +41,7 @@ class SQLValidator:
             r"\bCONVERT\s*\(": 
                 "CONVERT() function detected (possible injection chain)",
 
-            r"\b(?:JOIN|INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN|"
-            r"CROSS\s+JOIN|OUTER\s+JOIN)\b":
-                "JOIN operations are not allowed (single-table system)"
+        
         }
         
         self.forbidden_commands = [
@@ -100,9 +96,9 @@ class SQLValidator:
         
     def _check_schema_lock(self, sql):
             """ Check if query references table name"""
-            if self.table not in sql:
-                error_message = f"Query must reference table {self.table}"
-                return False, error_message, None
+            #if self.table not in sql:
+            # #   error_message = f"Query must reference table {self.table}"
+            #    return False, error_message, None
             return True, "OK", None
         
     def _check_basic_syntax(self, sql):
@@ -144,17 +140,18 @@ class SQLValidator:
         if not ok:
             errors.append(f"Injection risk: {msg}")
         
-        ok, msg, token = self._check_schema_lock(sql)
-        if not ok:
-            errors.append(f"Schema violation: {msg}")
+       # ok, msg, token = self._check_schema_lock(sql)
+       # if not ok:
+       #     errors.append(f"Schema violation: {msg}")
         
         ok, msg, token = self._check_functions(sql)
         if not ok:
             errors.append(f"Function restriction: {msg}")
         
-        ok, msg, token = self._check_limit(sql)
-        if not ok:
-            errors.append(f"Missing requirement: {msg}")
+        # LIMIT check disabled for multi-table queries (may have subqueries)
+        # ok, msg, token = self._check_limit(sql)
+        # if not ok:
+        #     errors.append(f"Missing requirement: {msg}")
         
         ok, msg, token = self._check_basic_syntax(sql)
         if not ok:

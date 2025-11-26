@@ -41,7 +41,7 @@ class JoinPath:
 class SchemaParser:
     """ PArses Starschema and manages table realtionships"""
     
-    def __init__(self, schema_name:str):
+    def __init__(self, schema_name: str):
         self.schema_name = schema_name
         self.schema_data : Optional[Dict] = None
         self.relationships: List[TableRelationship] = []
@@ -260,6 +260,23 @@ def get_schema_parser(schema_name: str = "retial_star_schema") -> SchemaParser:
         _schema_parser_instance.load_star_schema()
     
     return _schema_parser_instance
+
+
+def get_schema_parser_from_data(schema_data: Dict) -> SchemaParser:
+    """ Create SchemaParser from Dictionary """
+    schema_name = schema_data.get("name", "user_schema")
+    parser = SchemaParser(schema_name)
+    parser.schema_data = schema_data
+    
+    parser._parse_tables()
+    parser._parse_relationships()
+    parser._parse_synonyms()
+    parser._parse_kpis()
+    parser._parse_notes()
+    parser._parse_examples()
+    parser._parse_glossary()
+    logger.info(f"Loaded schema from dict: {schema_name}")
+    return parser
                     
             
         

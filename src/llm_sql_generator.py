@@ -301,7 +301,7 @@ def generate_sql_with_validation(user_question: str, validator, rossmann_schema:
     return sql_query, confidence_score, validation_passed
 
 
-def generate_multi_table_sql(user_question: str, schema_name: str = "retial_star_schema", validator=None) -> str:
+def generate_multi_table_sql(user_question: str, schema_name: str = None , schema_data: Dict = None ) -> str:
     """
     Generates SQL query with automatic table selection and JOIN generation.
     
@@ -326,7 +326,12 @@ def generate_multi_table_sql(user_question: str, schema_name: str = "retial_star
             logger.info(f"Date conversion applied:\nOriginal: {user_question}\nProcessed: {processed_question}")
         
         # 1. Load schema via singleton
-        parser = get_schema_parser(schema_name)
+        if schema_data:
+            parser = get_schema_parser_from_data(schema_data)
+        elif schema_name:
+            parser = get_schema_parser(schema_name)
+        else:
+            raise ValueError("Both schema_data and schema_name are not available")
         
         # 2. Get relevant tables (LLM decides which tables needed)
         relevant_tables = parser.get_relevant_tables(processed_question)

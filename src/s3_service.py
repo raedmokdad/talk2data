@@ -31,6 +31,13 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         username = payload.get("cognito:username") or payload.get("username")
         if not username:
             raise HTTPException(status_code=401, detail="Username not found in token")
+        
+        # if username is an email
+        if '@' in username:
+            username = username.split('@')[0]
+        # For S3 : no points only lowercase
+        username = username.lower().replace('.', '_')
+        
         return username
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")

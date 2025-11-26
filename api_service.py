@@ -105,7 +105,7 @@ async def health_check():
 
 
 @app.post("/generate-sql", response_model=QueryResponse)
-async def generate_sql(request: QueryRequest):
+async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_current_user)):
     """Generate SQL query from natural language question"""
     start_time = time.time()
     
@@ -120,19 +120,36 @@ async def generate_sql(request: QueryRequest):
         # Determine schema name to use
         schema_name = request.schema_name if request.schema_name else "retial_star_schema"
         
-        # Generate SQL with Multi-Table support (automatic table selection + JOINs)
-        sql_query = generate_multi_table_sql(
-            user_question=request.question.strip(),
-            schema_name=schema_name
-        )
+        #Load schema from S3 for current user
+        success, schema_data = get_user_schema(current_user, schema_name)
+        if not success or not schema_data:
+            # Fallback to local schema for testing
+            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{current_user}', using local fallback")
+            sql_query = generate_multi_table_sql(
+                user_question=request.question.strip(),
+                schema_name=schema_name  # ← Local fallback
+            )
+        else:
+            # Use S3 schema
+            sql_query = generate_multi_table_sql(
+                user_question=request.question.strip(),
+                schema_data=schema_data
+            )
         
+        # Validate SQL for security threats
+        validator = SQLValidator()
+        validation_result = validator.validate(sql_query)
+        validation_passed = validation_result["ok"]
+        
+        if not validation_passed:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"SQL validation failed: {validation_result['error_message']}"
+            )
+    
         processing_time = time.time() - start_time
-        
-        # For backward compatibility, set confidence and validation to True
-        # (Multi-table version doesn't return these yet)
-        confidence = 0.95  # High confidence for multi-table algorithmic JOINs
-        validation_passed = True
-        message = "SQL generated successfully with multi-table support"
+        confidence = 0.95
+        message = "SQL generated and validated successfully"
         
         return QueryResponse(
             sql_query=sql_query,
