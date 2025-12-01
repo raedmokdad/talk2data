@@ -26,6 +26,9 @@ sys.path.insert(0, str(project_root))
 from src.s3_service import upload_user_schema, get_current_user, get_s3_client
 import boto3
 
+# API Configuration - Use Railway URL or localhost for development
+API_URL = os.environ.get("API_URL", "https://talk2data-production.up.railway.app")
+
 # Page config
 st.set_page_config(
     page_title="Schema Builder - Talk2Data",
@@ -131,7 +134,6 @@ def upload_schema_to_s3(schema_data: Dict, schema_name: str, username: str):
 def test_schema_with_sql(question: str, schema_name: str) -> tuple[bool, str]:
     """Test the schema by generating SQL from a question"""
     try:
-        API_URL = "http://localhost:8000"
         response = requests.post(
             f"{API_URL}/generate-sql",
             json={
@@ -995,7 +997,6 @@ if app_mode == "📝 Schema Builder":
             
             with col_health_b:
                 try:
-                    API_URL = "http://localhost:8000"
                     response = requests.get(f"{API_URL}/health", timeout=5)
                     if response.status_code == 200:
                         st.success("✅ API Online")
@@ -1089,7 +1090,6 @@ if app_mode == "📝 Schema Builder":
                 if test_question:
                     with st.spinner("Generating SQL..."):
                         try:
-                            API_URL = "http://localhost:8000"
                             username = st.session_state.username or "raedmokdad"
                             selected_schema = st.session_state['selected_test_schema']
                             
@@ -1316,7 +1316,6 @@ else:  # app_mode == "🔍 Database Query"
                     if generate_clicked and user_question:
                         with st.spinner("🤖 Generating SQL from your question..."):
                             try:
-                                api_url = "http://localhost:8000/generate-sql"
                                 username = st.session_state.get('username', 'raedmokdad')
                                 
                                 payload = {
@@ -1325,7 +1324,7 @@ else:  # app_mode == "🔍 Database Query"
                                     "username": username
                                 }
                                 
-                                response = requests.post(api_url, json=payload, timeout=30)
+                                response = requests.post(f"{API_URL}/generate-sql", json=payload, timeout=30)
                                 
                                 if response.status_code == 200:
                                     result = response.json()
