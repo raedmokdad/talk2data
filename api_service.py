@@ -118,28 +118,21 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         
         # Determine schema name to use
         schema_name = request.schema_name if request.schema_name else "retial_star_schema"
-        username = request.username if request.username else current_user
         
-        # Load schema from S3 for user
-        logger.info(f"Loading schema '{schema_name}' for user '{username}' from S3")
-        success, schema_data = get_user_schema(username, schema_name)
+        # Load schema from S3 for current user (from auth)
+        logger.info(f"Loading schema '{schema_name}' for user '{current_user}' from S3")
+        success, schema_data = get_user_schema(current_user, schema_name)
         
         if not success or not schema_data:
-            # Try local fallback only for built-in schemas
-            if schema_name in ["retial_star_schema", "rossman_schema", "hr_schema"]:
-                logger.warning(f"Schema '{schema_name}' not found in S3, using local fallback")
-                sql_query = generate_multi_table_sql(
-                    user_question=request.question.strip(),
-                    schema_name=schema_name
-                )
-            else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Schema '{schema_name}' not found for user '{username}'. Please check the schema name or upload it first."
-                )
+            # Fallback to local schema for testing
+            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{current_user}', using local fallback")
+            sql_query = generate_multi_table_sql(
+                user_question=request.question.strip(),
+                schema_name=schema_name  # Local fallback
+            )
         else:
             # Use S3 schema
-            logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
+            logger.info(f"Using S3 schema '{schema_name}' for user '{current_user}'")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
                 schema_data=schema_data
