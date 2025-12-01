@@ -2,7 +2,7 @@
 Schema Builder Dashboard for Talk2Data
 Create and manage star schema JSON files with visual interface
 """
-
+from __future__ import annotations
 import streamlit as st
 import json
 import os
@@ -11,6 +11,14 @@ from datetime import datetime
 from typing import Dict, List, Any
 import sys
 import requests
+import os
+from pathlib import Path
+from typing import List
+import pandas as pd
+from src.models import DBType, DBSelection, FileItem, FileType
+from src.factory import create_connector
+from src.base_connector import BaseConnector
+import altair as alt
 
 # Add src to path for imports
 project_root = Path(__file__).parent
@@ -25,6 +33,7 @@ st.set_page_config(
     page_icon="🏗️",
     layout="wide"
 )
+
 
 # Add authentication import
 try:
@@ -64,6 +73,8 @@ if 'user_tokens' not in st.session_state:
 if 'current_schema_name' not in st.session_state:
     st.session_state.current_schema_name = "my_star_schema"
 
+def get_connector() -> BaseConnector | None:
+    return st.session_state.get("connector")
 
 def create_default_table(table_type: str = "fact") -> Dict[str, Any]:
     """Create a default table template"""
@@ -390,17 +401,117 @@ with st.sidebar.expander("🗑️ Delete from S3"):
     except Exception as e:
         st.warning("S3 not available")
 
+
+# --- Sidebar: Data source selection ---
+st.sidebar.header("1. Data Source")
+
+db_type_label_to_enum = {
+    "PostgreSQL": DBType.POSTGRES,
+    "MySQL": DBType.MYSQL,
+    "Amazon Redshift": DBType.REDSHIFT,
+    "CSV / Excel Files": DBType.FILES,
+}
+
+db_choice = st.sidebar.selectbox(
+    "Select data source type",
+    list(db_type_label_to_enum.keys()),
+)
+
+selected_db_type = db_type_label_to_enum[db_choice]
+
+selection_kwargs = {"db_type": selected_db_type}
+
+# SQL DB configuration
+if selected_db_type in {DBType.POSTGRES, DBType.MYSQL, DBType.REDSHIFT}:
+    st.sidebar.subheader("SQL Connection Details")
+
+    host = st.sidebar.text_input("Host", value="localhost")
+    port_default = 5432 if selected_db_type != DBType.MYSQL else 3306
+    port = st.sidebar.number_input("Port", value=port_default, step=1)
+    database = st.sidebar.text_input("Database name")
+    user = st.sidebar.text_input("User")
+    password = st.sidebar.text_input("Password", type="password")
+
+    selection_kwargs.update(
+        {
+            "host": host,
+            "port": port,
+            "database": database,
+            "user": user,
+            "password": password,
+        }
+    )
+
+# File-based configuration
+elif selected_db_type == DBType.FILES:
+    st.sidebar.subheader("S3 paths (no listing)")
+
+    s3_paths = st.sidebar.text_area(
+        "Enter S3 paths (one per line), e.g.\n"
+        "s3://excel-bucket-fortest/rossmann/rossmann_2013.xlsx\n"
+        "s3://excel-bucket-fortest/rossmann/rossmann_2014.csv"
+    )
+
+    file_items: list[FileItem] = []
+
+    for line in s3_paths.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        lower = line.lower()
+        if lower.endswith(".csv"):
+            file_items.append(
+                FileItem(
+                    s3_uri=line,
+                    type=FileType.CSV,
+                )
+            )
+        elif lower.endswith((".xlsx", ".xls")):
+            sheet_input_key = f"sheet_{line}"
+            sheet_name = st.sidebar.text_input(
+                f"Sheet name for {line} (optional, default first sheet)",
+                key=sheet_input_key,
+            )
+            file_items.append(
+                FileItem(
+                    s3_uri=line,
+                    type=FileType.EXCEL,
+                    sheet_name=sheet_name or None,
+                )
+            )
+        else:
+            st.sidebar.warning(f"Unsupported file type: {line}")
+
+    selection_kwargs["files"] = file_items if file_items else None
+
+
+# --- Connect button ---
+if st.sidebar.button("Connect"):
+    try:
+        selection = DBSelection(**selection_kwargs)
+        connector = create_connector(selection)
+        st.session_state["connector"] = connector
+        st.success("✅ Connected successfully!")
+        st.write("Available tables:", ", ".join(connector.list_tables()))
+    except Exception as e:
+        st.error(f"❌ Connection failed: {e}")
+
+connector = get_connector()                
+
 # ============================================================================
 # MAIN CONTENT TABS
 # ============================================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📊 Tables", 
     "🔗 Relationships", 
     "📈 Metrics", 
     "💡 Examples", 
     "📖 Glossary",
-    "🧪 Test SQL"
+    "🧪 Test SQL",
+    "🗂️ Schema Explorer", 
+    "💻 SQL Playground"
 ])
 
 # ============================================================================
@@ -989,6 +1100,182 @@ with tab6:
             
             total_columns = sum(len(t.get('columns', {})) for t in tables)
             st.metric("Total Columns", total_columns)
+
+
+
+if connector is not None:
+     
+    with tab7:
+        st.subheader("Schema Explorer")
+
+        tables = connector.list_tables()
+        if not tables:
+            st.warning("No tables available.")
+        else:
+            table_name = st.selectbox("Select a table", tables)
+            schema = connector.get_table_schema(table_name)
+            st.write(f"Schema for **{table_name}**")
+            st.dataframe(schema)
+
+    with tab8:
+            
+            st.subheader("SQL Playground")
+
+            default_sql = ""
+            tables = connector.list_tables()
+            if tables:
+                default_sql = f"SELECT * FROM {tables[0]} LIMIT 10;"
+
+            user_sql = st.text_area(
+                "Enter SQL query",
+                value=default_sql,
+                height=160,
+                key="sql_input",
+            )
+
+            run_clicked = st.button("Run query")
+
+            # --- 1) Run the query and store result in session_state ---
+            if run_clicked:
+                lowered = user_sql.strip().lower()
+                try:
+                    if lowered.startswith("select"):
+                        rows = connector.run_query(user_sql)
+                        df = pd.DataFrame(rows)
+                        st.session_state["last_df"] = df
+                        st.session_state["last_sql"] = user_sql
+                        st.session_state["last_msg"] = f"Returned {len(df)} rows"
+                    else:
+                        connector.execute(user_sql)
+                        st.session_state["last_df"] = None
+                        st.session_state["last_sql"] = user_sql
+                        st.session_state["last_msg"] = "✅ Statement executed successfully."
+                except Exception as e:
+                    st.session_state["last_df"] = None
+                    st.session_state["last_sql"] = user_sql
+                    st.session_state["last_msg"] = f"❌ Error: {e}"
+
+            # --- 2) Always display last result + charts (independent of button) ---
+            last_msg = st.session_state.get("last_msg")
+            if last_msg:
+                st.write(last_msg)
+
+            df = st.session_state.get("last_df")
+
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                st.dataframe(df)
+
+                with st.expander("📊 Visualize this result"):
+                    # Detect numeric columns for Y axis
+                    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
+                    all_cols = df.columns.tolist()
+
+                    chart_type = st.selectbox(
+                        "Chart type",
+                        ["Line", "Bar", "Area", "Pie", "Donut", "Funnel"],
+                        index=0,
+                        key="chart_type_selector",
+                    )
+
+                    x_col = st.selectbox(
+                        "X axis",
+                        options=all_cols,
+                        key="x_axis_selector",
+                    )
+
+                    y_col = st.selectbox(
+                        "Y axis (numeric)",
+                        options=numeric_cols,
+                        index=0 if numeric_cols else None,
+                        key="y_axis_selector",
+                    )
+
+                    if not numeric_cols:
+                        st.warning("No numeric columns available for Y axis.")
+                    elif x_col == y_col:
+                        st.warning("X axis and Y axis must be different columns.")
+                    else:
+                    
+                        if chart_type == "Line":
+                            st.line_chart(df, x=x_col, y=y_col)
+                        elif chart_type == "Bar":
+                            st.bar_chart(df, x=x_col, y=y_col)
+                        elif chart_type == "Donut":
+                            # Donut charts need categorical x and a numeric y (aggregated)
+                            if not numeric_cols:
+                                st.warning("No numeric column available for Donut chart.")
+                            else:
+                                st.write(f"Showing Donut chart for **{y_col}** grouped by **{x_col}**")
+
+                                # Aggregate data for donut
+                                donut_df = df.groupby(x_col)[y_col].sum().reset_index()
+
+                                donut_chart = (
+                                    alt.Chart(donut_df)
+                                    .mark_arc(innerRadius=70)  # innerRadius > 0 → donut
+                                    .encode(
+                                        theta=f"{y_col}:Q",
+                                        color=f"{x_col}:N",
+                                        tooltip=[x_col, y_col],
+                                    )
+                                    .properties(width=350, height=350)
+                                )
+
+                                st.altair_chart(donut_chart, use_container_width=False)    
+                        elif chart_type == "Pie":
+                            if not numeric_cols:
+                                st.warning("No numeric column available for Pie chart.")
+                            else:
+                                st.write(f"Showing Pie chart for **{y_col}** grouped by **{x_col}**")
+
+                                # Prepare data for Pie: group by x_col
+                                pie_df = df.groupby(x_col)[y_col].sum().reset_index()
+
+                                pie_chart = (
+                                    alt.Chart(pie_df)
+                                    .mark_arc()     # pie chart (no inner radius)
+                                    .encode(
+                                        theta=f"{y_col}:Q",
+                                        color=f"{x_col}:N",
+                                        tooltip=[x_col, y_col],
+                                    )
+                                    .properties(width=350, height=350)
+                                )
+
+                                st.altair_chart(pie_chart, use_container_width=False)    
+                        elif chart_type == "Funnel":
+                            if not numeric_cols:
+                                st.warning("No numeric column available for Funnel chart.")
+                            else:
+                                st.write(f"Showing Funnel chart for **{y_col}** by **{x_col}**")
+
+                                # Aggregate by stage (x_col)
+                                funnel_df = df.groupby(x_col)[y_col].sum().reset_index()
+
+                                # Sort from largest to smallest (typical funnel)
+                                funnel_df = funnel_df.sort_values(by=y_col, ascending=False)
+
+                                funnel_chart = (
+                                    alt.Chart(funnel_df)
+                                    .mark_bar()
+                                    .encode(
+                                        x=alt.X(f"{y_col}:Q", title=y_col),
+                                        y=alt.Y(f"{x_col}:N",
+                                                sort=funnel_df[x_col].tolist(),  # keep our sorted order
+                                                title=x_col),
+                                        tooltip=[x_col, y_col],
+                                    )
+                                    .properties(
+                                        width=500,
+                                        height=300,
+                                    )
+                                )
+
+                                st.altair_chart(funnel_chart, use_container_width=True)  
+                        
+                        else:  # Area
+                            st.area_chart(df, x=x_col, y=y_col)
+
 
 # ============================================================================
 # JSON PREVIEW

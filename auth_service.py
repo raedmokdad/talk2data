@@ -10,6 +10,7 @@ import hashlib
 import base64
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from typing import Tuple, Union, Dict
 
 load_dotenv()
 
@@ -142,7 +143,7 @@ def resend_confirmation_code(username: str) -> tuple[bool, str]:
         return False, f"Failed to resend code: {e.response['Error']['Message']}"
 
 
-def login_user(username: str, password: str) -> tuple[bool, dict | str]:
+def login_user(username: str, password: str) -> Tuple[bool, Union[Dict, str]]:
     """
     Authenticate user and get tokens
     
@@ -303,7 +304,7 @@ def logout_user(access_token: str) -> tuple[bool, str]:
         return False, f"Logout failed: {e.response['Error']['Message']}"
 
 
-def get_user_info(access_token: str) -> tuple[bool, dict | str]:
+def get_user_info(access_token: str) -> Tuple[bool, Union[Dict, str]]:
     """
     Get authenticated user's information
     
