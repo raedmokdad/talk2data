@@ -1,0 +1,110 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_production",
+        "role": "fact",
+        "grain": "one row per production batch",
+        "columns": {
+          "batch_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "machine_key": "INT - Foreign key to dim_machine",
+          "product_key": "INT - Foreign key to dim_product",
+          "shift_key": "INT - Foreign key to dim_shift",
+          "units_produced": "INT - Units produced",
+          "units_defective": "INT - Defective units",
+          "production_time_hours": "DECIMAL(6,2) - Production time",
+          "material_cost": "DECIMAL(10,2) - Material cost",
+          "energy_cost": "DECIMAL(10,2) - Energy cost"
+        },
+        "primary_key": "batch_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "machine_key": "dim_machine.machine_key",
+          "product_key": "dim_product.product_key",
+          "shift_key": "dim_shift.shift_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month",
+          "week": "INT - Week number"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_machine",
+        "role": "dimension",
+        "grain": "one row per machine",
+        "columns": {
+          "machine_key": "INT - Surrogate key",
+          "machine_id": "VARCHAR - Machine ID",
+          "machine_type": "VARCHAR - Machine type",
+          "installation_date": "DATE - Installation date",
+          "capacity_per_hour": "INT - Capacity per hour"
+        },
+        "primary_key": "machine_key"
+      },
+      {
+        "name": "dim_product",
+        "role": "dimension",
+        "grain": "one row per product",
+        "columns": {
+          "product_key": "INT - Surrogate key",
+          "product_code": "VARCHAR - Product code",
+          "product_name": "VARCHAR - Product name",
+          "product_line": "VARCHAR - Product line"
+        },
+        "primary_key": "product_key"
+      },
+      {
+        "name": "dim_shift",
+        "role": "dimension",
+        "grain": "one row per shift",
+        "columns": {
+          "shift_key": "INT - Surrogate key",
+          "shift_name": "VARCHAR - Shift name",
+          "start_time": "TIME - Shift start time",
+          "end_time": "TIME - Shift end time"
+        },
+        "primary_key": "shift_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_production.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_production.machine_key", "to": "dim_machine.machine_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_production.product_key", "to": "dim_product.product_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_production.shift_key", "to": "dim_shift.shift_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "maschine": {"column": "machine_id", "table": "dim_machine"},
+    "produktion": {"column": "units_produced", "table": "fact_production"},
+    "fehler": {"column": "units_defective", "table": "fact_production"}
+  },
+  "kpis": {
+    "defect_rate": {
+      "formula": "SUM(fact_production.units_defective) / NULLIF(SUM(fact_production.units_produced), 0)",
+      "description": "Defect rate percentage",
+      "required_tables": ["fact_production"]
+    },
+    "efficiency": {
+      "formula": "SUM(fact_production.units_produced) / NULLIF(SUM(fact_production.production_time_hours), 0)",
+      "description": "Units per hour",
+      "required_tables": ["fact_production"]
+    },
+    "total_cost": {
+      "formula": "SUM(fact_production.material_cost + fact_production.energy_cost)",
+      "description": "Total production cost",
+      "required_tables": ["fact_production"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

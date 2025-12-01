@@ -2,14 +2,14 @@
 
 Turn your questions into SQL queries! Just ask in plain English and get SQL back.
 
-> I built this to ask questions about Rossmann store data without writing complex SQL. It uses OpenAI's GPT to understand what you want and creates safe SQL queries.
+> I built this to ask questions about Rossmann store data without writing complex SQL. It understands what you want and creates safe SQL queries.
 
 ## What it does
 
 - **Ask in English**: "Show me sales for store 5" 
-- **Get SQL back**: The AI writes the SQL for you
+- **Get SQL back**: The system writes the SQL for you
 - **Stay safe**: Validates queries so nothing breaks
-- **Pretty smart**: Uses GPT-4 to understand your question
+- **Pretty smart**: Advanced language processing to understand your question
 
 ## Quick example
 
@@ -30,7 +30,7 @@ Confidence: 0.85
 
 ### What you need
 - Python 3.10+ 
-- OpenAI API key (get one at openai.com)
+- Language model API access
 
 ### Installation steps
 ```bash
@@ -46,8 +46,8 @@ python -m venv .venv
 # Install stuff
 pip install -r requirements.txt
 
-# Add your OpenAI key
-# Create a .env file and put: OPENAI_API_KEY=your-key-here
+# Add your API key
+# Create a .env file and put: LANGUAGE_MODEL_API_KEY=your-key-here
 ```
 
 ### Try it out
@@ -61,11 +61,11 @@ python talk2data_agent.py
 ```
 src/
 ├── talk2data_agent.py       # Main program - start here
-├── llm_sql_generator.py     # The AI magic happens here  
+├── llm_sql_generator.py     # The query generation logic  
 ├── sql_validator.py         # Keeps queries safe
 └── test_sql_validator.py    # Tests to make sure it works
 
-prompts/                     # Templates for the AI
+prompts/                     # Templates for query generation
 config/                      # Database schema info
 data/                        # Some example queries
 ```
@@ -74,9 +74,9 @@ data/                        # Some example queries
 
 It's pretty simple:
 1. You ask a question in English
-2. AI generates SQL query for you
+2. System generates SQL query for you
 3. System checks if the SQL is safe
-4. If not good enough, AI tries again
+4. If not good enough, system tries again
 5. You get the final SQL
 
 ## What questions can you ask?
@@ -116,7 +116,7 @@ Get: `SELECT AVG(sales) FROM rossmann_data WHERE store = 123`
 ## Tech stuff (if you care)
 
 - Python 3.12
-- OpenAI GPT-4o-mini for the AI part
+- Advanced language model for natural language processing
 - Validates SQL so nothing dangerous runs
 - Has retry logic when AI messes up
 

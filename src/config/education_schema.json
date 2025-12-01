@@ -1,0 +1,110 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_enrollment",
+        "role": "fact",
+        "grain": "one row per student course enrollment",
+        "columns": {
+          "enrollment_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "student_key": "INT - Foreign key to dim_student",
+          "course_key": "INT - Foreign key to dim_course",
+          "instructor_key": "INT - Foreign key to dim_instructor",
+          "grade": "DECIMAL(4,2) - Final grade",
+          "attendance_rate": "DECIMAL(4,2) - Attendance percentage",
+          "tuition_fee": "DECIMAL(10,2) - Tuition fee paid",
+          "is_passed": "BOOLEAN - TRUE if passed"
+        },
+        "primary_key": "enrollment_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "student_key": "dim_student.student_key",
+          "course_key": "dim_course.course_key",
+          "instructor_key": "dim_instructor.instructor_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "semester": "VARCHAR - Semester",
+          "academic_year": "VARCHAR - Academic year"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_student",
+        "role": "dimension",
+        "grain": "one row per student",
+        "columns": {
+          "student_key": "INT - Surrogate key",
+          "student_id": "VARCHAR - Student ID",
+          "major": "VARCHAR - Major",
+          "enrollment_status": "VARCHAR - Enrollment status",
+          "scholarship_type": "VARCHAR - Scholarship type"
+        },
+        "primary_key": "student_key"
+      },
+      {
+        "name": "dim_course",
+        "role": "dimension",
+        "grain": "one row per course",
+        "columns": {
+          "course_key": "INT - Surrogate key",
+          "course_code": "VARCHAR - Course code",
+          "course_name": "VARCHAR - Course name",
+          "department": "VARCHAR - Department",
+          "credits": "INT - Credit hours"
+        },
+        "primary_key": "course_key"
+      },
+      {
+        "name": "dim_instructor",
+        "role": "dimension",
+        "grain": "one row per instructor",
+        "columns": {
+          "instructor_key": "INT - Surrogate key",
+          "instructor_name": "VARCHAR - Instructor name",
+          "title": "VARCHAR - Academic title",
+          "department": "VARCHAR - Department"
+        },
+        "primary_key": "instructor_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_enrollment.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_enrollment.student_key", "to": "dim_student.student_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_enrollment.course_key", "to": "dim_course.course_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_enrollment.instructor_key", "to": "dim_instructor.instructor_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "student": {"column": "student_id", "table": "dim_student"},
+    "kurs": {"column": "course_name", "table": "dim_course"},
+    "note": {"column": "grade", "table": "fact_enrollment"}
+  },
+  "kpis": {
+    "pass_rate": {
+      "formula": "SUM(CASE WHEN fact_enrollment.is_passed = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Course pass rate",
+      "required_tables": ["fact_enrollment"]
+    },
+    "average_grade": {
+      "formula": "AVG(fact_enrollment.grade)",
+      "description": "Average grade",
+      "required_tables": ["fact_enrollment"]
+    },
+    "total_revenue": {
+      "formula": "SUM(fact_enrollment.tuition_fee)",
+      "description": "Total tuition revenue",
+      "required_tables": ["fact_enrollment"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

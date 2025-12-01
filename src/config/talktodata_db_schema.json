@@ -1,0 +1,260 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "orders",
+        "role": "fact",
+        "grain": "one row per order",
+        "columns": {
+          "order_id": "INTEGER - Primary key, unique order identifier",
+          "customer_id": "INTEGER - Foreign key to customers table",
+          "order_date": "DATE - Date when order was placed",
+          "order_status": "VARCHAR - Status of the order (pending, completed, cancelled)",
+          "currency": "VARCHAR - Currency code (EUR, USD, etc.)",
+          "total_amount": "NUMERIC - Total order amount in specified currency"
+        },
+        "primary_key": "order_id",
+        "foreign_keys": {
+          "customer_id": "customers.customer_id"
+        }
+      },
+      {
+        "name": "order_items",
+        "role": "fact",
+        "grain": "one row per product in an order",
+        "columns": {
+          "order_item_id": "INTEGER - Primary key, unique order item identifier",
+          "order_id": "INTEGER - Foreign key to orders table",
+          "product_id": "INTEGER - Foreign key to products table",
+          "quantity": "INTEGER - Number of units ordered",
+          "item_price": "NUMERIC - Price per unit at time of order"
+        },
+        "primary_key": "order_item_id",
+        "foreign_keys": {
+          "order_id": "orders.order_id",
+          "product_id": "products.product_id"
+        }
+      },
+      {
+        "name": "sales",
+        "role": "fact",
+        "grain": "one row per store sale per day",
+        "columns": {
+          "id": "INTEGER - Primary key, unique sale record identifier",
+          "store_id": "INTEGER - Store identifier",
+          "sale_date": "DATE - Date of the sale",
+          "amount": "NUMERIC - Total sales amount for the store on this date"
+        },
+        "primary_key": "id",
+        "foreign_keys": {}
+      },
+      {
+        "name": "transactions",
+        "role": "fact",
+        "grain": "one row per payment transaction",
+        "columns": {
+          "transaction_id": "INTEGER - Primary key, unique transaction identifier",
+          "order_id": "INTEGER - Foreign key to orders table",
+          "payment_date": "DATE - Date when payment was processed",
+          "payment_method": "VARCHAR - Payment method used (credit_card, paypal, bank_transfer)",
+          "amount": "NUMERIC - Payment amount",
+          "currency": "VARCHAR - Currency code (EUR, USD, etc.)"
+        },
+        "primary_key": "transaction_id",
+        "foreign_keys": {
+          "order_id": "orders.order_id"
+        }
+      },
+      {
+        "name": "refunds",
+        "role": "fact",
+        "grain": "one row per refund",
+        "columns": {
+          "refund_id": "INTEGER - Primary key, unique refund identifier",
+          "order_id": "INTEGER - Foreign key to orders table",
+          "refund_date": "DATE - Date when refund was issued",
+          "refund_amount": "NUMERIC - Amount refunded",
+          "reason": "VARCHAR - Reason for refund"
+        },
+        "primary_key": "refund_id",
+        "foreign_keys": {
+          "order_id": "orders.order_id"
+        }
+      },
+      {
+        "name": "shipments",
+        "role": "fact",
+        "grain": "one row per shipment",
+        "columns": {
+          "shipment_id": "INTEGER - Primary key, unique shipment identifier",
+          "order_id": "INTEGER - Foreign key to orders table",
+          "carrier": "VARCHAR - Shipping carrier name (DHL, UPS, FedEx)",
+          "tracking_number": "VARCHAR - Tracking number for shipment",
+          "shipment_date": "DATE - Date when order was shipped",
+          "delivery_date": "DATE - Date when order was delivered",
+          "status": "VARCHAR - Shipment status (in_transit, delivered, returned)"
+        },
+        "primary_key": "shipment_id",
+        "foreign_keys": {
+          "order_id": "orders.order_id"
+        }
+      },
+      {
+        "name": "customers",
+        "role": "dimension",
+        "grain": "one row per customer",
+        "columns": {
+          "customer_id": "INTEGER - Primary key, unique customer identifier",
+          "first_name": "VARCHAR - Customer's first name",
+          "last_name": "VARCHAR - Customer's last name",
+          "email": "VARCHAR - Customer's email address",
+          "phone": "VARCHAR - Customer's phone number",
+          "street_address": "VARCHAR - Street address",
+          "postal_code": "VARCHAR - Postal/ZIP code",
+          "city": "VARCHAR - City name",
+          "country": "VARCHAR - Country name",
+          "registration_date": "DATE - Date when customer registered"
+        },
+        "primary_key": "customer_id"
+      },
+      {
+        "name": "products",
+        "role": "dimension",
+        "grain": "one row per product",
+        "columns": {
+          "product_id": "INTEGER - Primary key, unique product identifier",
+          "product_name": "VARCHAR - Name of the product",
+          "category": "VARCHAR - Product category (electronics, clothing, food, etc.)",
+          "vendor_brand": "VARCHAR - Brand or vendor name",
+          "price": "NUMERIC - Current product price",
+          "currency": "VARCHAR - Currency code (EUR, USD, etc.)",
+          "created_at": "DATE - Date when product was added to catalog"
+        },
+        "primary_key": "product_id"
+      }
+    ],
+    "relationships": [
+      {
+        "from": "orders.customer_id",
+        "to": "customers.customer_id",
+        "type": "many-to-one",
+        "description": "Each order belongs to one customer"
+      },
+      {
+        "from": "order_items.order_id",
+        "to": "orders.order_id",
+        "type": "many-to-one",
+        "description": "Each order item belongs to one order"
+      },
+      {
+        "from": "order_items.product_id",
+        "to": "products.product_id",
+        "type": "many-to-one",
+        "description": "Each order item references one product"
+      },
+      {
+        "from": "transactions.order_id",
+        "to": "orders.order_id",
+        "type": "many-to-one",
+        "description": "Each transaction is for one order"
+      },
+      {
+        "from": "refunds.order_id",
+        "to": "orders.order_id",
+        "type": "many-to-one",
+        "description": "Each refund is for one order"
+      },
+      {
+        "from": "shipments.order_id",
+        "to": "orders.order_id",
+        "type": "many-to-one",
+        "description": "Each shipment is for one order"
+      }
+    ],
+    "metrics": {
+      "total_revenue": {
+        "formula": "SUM(orders.total_amount)",
+        "description": "Total revenue from all orders",
+        "required_tables": ["orders"],
+        "keywords": ["umsatz", "revenue", "total sales", "einnahmen"]
+      },
+      "average_order_value": {
+        "formula": "AVG(orders.total_amount)",
+        "description": "Average value per order",
+        "required_tables": ["orders"],
+        "keywords": ["durchschnitt", "average order", "aov"]
+      },
+      "total_orders": {
+        "formula": "COUNT(DISTINCT orders.order_id)",
+        "description": "Total number of orders",
+        "required_tables": ["orders"],
+        "keywords": ["anzahl bestellungen", "order count", "number of orders"]
+      },
+      "items_sold": {
+        "formula": "SUM(order_items.quantity)",
+        "description": "Total number of items sold",
+        "required_tables": ["order_items"],
+        "keywords": ["verkaufte artikel", "items sold", "quantity"]
+      },
+      "refund_rate": {
+        "formula": "COUNT(refunds.refund_id) * 100.0 / COUNT(DISTINCT orders.order_id)",
+        "description": "Percentage of orders that were refunded",
+        "required_tables": ["orders", "refunds"],
+        "keywords": ["rückgabequote", "refund rate", "return rate"]
+      },
+      "customer_count": {
+        "formula": "COUNT(DISTINCT customers.customer_id)",
+        "description": "Total number of customers",
+        "required_tables": ["customers"],
+        "keywords": ["kundenanzahl", "customer count", "anzahl kunden"]
+      }
+    },
+    "examples": [
+      {
+        "description": "Total revenue from all orders",
+        "pattern": "SELECT SUM(total_amount) as total_revenue FROM orders WHERE order_status = 'completed'"
+      },
+      {
+        "description": "Top 10 customers by total spending",
+        "pattern": "SELECT c.customer_id, c.first_name, c.last_name, SUM(o.total_amount) as total_spent FROM customers c JOIN orders o ON c.customer_id = o.customer_id WHERE o.order_status = 'completed' GROUP BY c.customer_id, c.first_name, c.last_name ORDER BY total_spent DESC LIMIT 10"
+      },
+      {
+        "description": "Top 10 products by quantity sold",
+        "pattern": "SELECT p.product_name, p.category, SUM(oi.quantity) as total_quantity FROM products p JOIN order_items oi ON p.product_id = oi.product_id GROUP BY p.product_id, p.product_name, p.category ORDER BY total_quantity DESC LIMIT 10"
+      },
+      {
+        "description": "Monthly revenue trend",
+        "pattern": "SELECT DATE_TRUNC('month', order_date) as month, SUM(total_amount) as monthly_revenue FROM orders WHERE order_status = 'completed' GROUP BY DATE_TRUNC('month', order_date) ORDER BY month"
+      },
+      {
+        "description": "Orders by status",
+        "pattern": "SELECT order_status, COUNT(*) as order_count, SUM(total_amount) as total_amount FROM orders GROUP BY order_status ORDER BY order_count DESC"
+      },
+      {
+        "description": "Revenue by product category",
+        "pattern": "SELECT p.category, SUM(oi.quantity * oi.item_price) as category_revenue FROM products p JOIN order_items oi ON p.product_id = oi.product_id GROUP BY p.category ORDER BY category_revenue DESC"
+      },
+      {
+        "description": "Customers with most orders",
+        "pattern": "SELECT c.customer_id, c.first_name, c.last_name, c.email, COUNT(o.order_id) as order_count FROM customers c JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_id, c.first_name, c.last_name, c.email ORDER BY order_count DESC LIMIT 10"
+      },
+      {
+        "description": "Average delivery time",
+        "pattern": "SELECT AVG(DATE_PART('day', delivery_date - shipment_date)) as avg_delivery_days FROM shipments WHERE delivery_date IS NOT NULL AND status = 'delivered'"
+      }
+    ],
+    "glossary": {
+      "order_status": "Status eines Auftrags: pending (ausstehend), completed (abgeschlossen), cancelled (storniert)",
+      "total_amount": "Gesamtbetrag einer Bestellung inklusive aller Artikel",
+      "item_price": "Preis eines einzelnen Artikels zum Zeitpunkt der Bestellung",
+      "refund_amount": "Betrag der Rückerstattung",
+      "payment_method": "Zahlungsmethode: credit_card (Kreditkarte), paypal (PayPal), bank_transfer (Überweisung)",
+      "shipment_status": "Versandstatus: in_transit (unterwegs), delivered (zugestellt), returned (zurückgesendet)",
+      "category": "Produktkategorie wie electronics, clothing, food, etc.",
+      "vendor_brand": "Marke oder Hersteller des Produkts",
+      "grain": "Granularität der Tabelle, definiert was eine Zeile repräsentiert",
+      "revenue": "Umsatz/Einnahmen aus Verkäufen",
+      "aov": "Average Order Value - Durchschnittlicher Bestellwert"
+    }
+  }
+}

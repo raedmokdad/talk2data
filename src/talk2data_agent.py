@@ -4,25 +4,26 @@ import logging
 import pathlib
 import sys
 
-# Add parent directory to path so imports work from anywhere
+
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 try:
     from src.llm_sql_generator import generate_multi_table_sql
     from src.sql_validator import SQLValidator
 except ModuleNotFoundError:
-    # Fallback for when running from src/ directory
+    
     from llm_sql_generator import generate_multi_table_sql
     from sql_validator import SQLValidator
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
-# setup
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.ERROR)
+
+
 load_dotenv()
 
-# Force load values from .env file to override system environment
+
 env_values = dotenv_values(".env")
 for key, value in env_values.items():
     if value:
@@ -30,11 +31,8 @@ for key, value in env_values.items():
 
 
 def main():
-    """
-    Simple Talk2Data - converts question to SQL
-    """
     try:
-        # Get user question
+        
         user_text = input("Your Question: ").strip()
         if not user_text:
             print("No question provided")
@@ -42,13 +40,13 @@ def main():
         
         print(f"\nProcessing: {user_text}")
         
-        # Multi-Table SQL Generation with automatic table selection and JOINs
+        
         sql_query = generate_multi_table_sql(
             user_question=user_text,
             schema_name="retial_star_schema"
         )
         
-        # Show Results
+        
         print("\n" + "="*60)
         print("GENERATED SQL QUERY:")
         print("="*60)

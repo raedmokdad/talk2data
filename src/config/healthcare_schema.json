@@ -1,0 +1,111 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_patient_visit",
+        "role": "fact",
+        "grain": "one row per patient visit",
+        "columns": {
+          "visit_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "patient_key": "INT - Foreign key to dim_patient",
+          "doctor_key": "INT - Foreign key to dim_doctor",
+          "department_key": "INT - Foreign key to dim_department",
+          "visit_duration_minutes": "INT - Duration of visit",
+          "treatment_cost": "DECIMAL(10,2) - Cost in EUR",
+          "medication_cost": "DECIMAL(10,2) - Medication cost",
+          "diagnosis_code": "VARCHAR - ICD-10 diagnosis code",
+          "is_emergency": "BOOLEAN - TRUE if emergency visit"
+        },
+        "primary_key": "visit_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "patient_key": "dim_patient.patient_key",
+          "doctor_key": "dim_doctor.doctor_key",
+          "department_key": "dim_department.department_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month",
+          "day_name": "VARCHAR - Day name",
+          "is_weekend": "BOOLEAN - TRUE if weekend"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_patient",
+        "role": "dimension",
+        "grain": "one row per patient",
+        "columns": {
+          "patient_key": "INT - Surrogate key",
+          "patient_id": "VARCHAR - Patient ID",
+          "age": "INT - Patient age",
+          "gender": "VARCHAR - Gender",
+          "insurance_type": "VARCHAR - Insurance type"
+        },
+        "primary_key": "patient_key"
+      },
+      {
+        "name": "dim_doctor",
+        "role": "dimension",
+        "grain": "one row per doctor",
+        "columns": {
+          "doctor_key": "INT - Surrogate key",
+          "doctor_name": "VARCHAR - Doctor name",
+          "specialty": "VARCHAR - Medical specialty",
+          "years_experience": "INT - Years of experience"
+        },
+        "primary_key": "doctor_key"
+      },
+      {
+        "name": "dim_department",
+        "role": "dimension",
+        "grain": "one row per department",
+        "columns": {
+          "department_key": "INT - Surrogate key",
+          "department_name": "VARCHAR - Department name",
+          "floor": "INT - Floor number"
+        },
+        "primary_key": "department_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_patient_visit.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_patient_visit.patient_key", "to": "dim_patient.patient_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_patient_visit.doctor_key", "to": "dim_doctor.doctor_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_patient_visit.department_key", "to": "dim_department.department_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "arzt": {"column": "doctor_name", "table": "dim_doctor"},
+    "patient": {"column": "patient_id", "table": "dim_patient"},
+    "kosten": {"column": "treatment_cost", "table": "fact_patient_visit"},
+    "notfall": {"column": "is_emergency", "table": "fact_patient_visit"}
+  },
+  "kpis": {
+    "total_revenue": {
+      "formula": "SUM(fact_patient_visit.treatment_cost + fact_patient_visit.medication_cost)",
+      "description": "Total healthcare revenue",
+      "required_tables": ["fact_patient_visit"]
+    },
+    "average_visit_cost": {
+      "formula": "AVG(fact_patient_visit.treatment_cost + fact_patient_visit.medication_cost)",
+      "description": "Average cost per visit",
+      "required_tables": ["fact_patient_visit"]
+    },
+    "emergency_rate": {
+      "formula": "SUM(CASE WHEN fact_patient_visit.is_emergency = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Percentage of emergency visits",
+      "required_tables": ["fact_patient_visit"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

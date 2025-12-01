@@ -14,8 +14,8 @@ from auth_service import (
 
 # Page Configuration
 st.set_page_config(
-    page_title="Talk2Data - AI SQL Generator",
-    page_icon="🤖",
+    page_title="Talk2Data - SQL Generator",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -302,8 +302,8 @@ def show_main_app():
                         st.error(message)
     
     # Main Content
-    st.title("🤖 Talk2Data - AI SQL Generator")
-    st.markdown("### Ask questions in natural language, get SQL queries!")
+    st.title("📊 Talk2Data - SQL Generator")
+    st.markdown("### Transform your business questions into SQL queries!")
     
     # API Health Check
     col1, col2 = st.columns([3, 1])
@@ -392,17 +392,20 @@ def show_main_app():
             else:
                 selected_schema_name = st.session_state.selected_schema
                 
-                with st.spinner("🤖 Generating SQL..."):
+                with st.spinner("⚡ Generating SQL..."):
                     try:
+                        # Get auth headers with JWT token
+                        headers = get_auth_header()
+                        
                         response = requests.post(
                             f"{API_URL}/generate-sql",
                             json={
                                 "question": question,
                                 "max_retries": max_retries,
                                 "confidence_threshold": confidence_threshold,
-                                "schema_name": selected_schema_name,  # Pass selected schema
-                                "username": st.session_state.user_email.split('@')[0]  # Pass username
+                                "schema_name": selected_schema_name  # Pass selected schema
                             },
+                            headers=headers,  # Add JWT token
                             timeout=30
                         )
                         

@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
-# Add src to Python path - robust for Railway
+
 current_dir = Path(__file__).parent
 src_path = current_dir / 'src'
 if str(src_path) not in sys.path:
@@ -18,11 +18,11 @@ from s3_service import list_user_schema, get_user_schema, upload_user_schema, de
 from llm_sql_generator import generate_multi_table_sql
 from sql_validator import SQLValidator
 
-# Configure logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI App
+
 app = FastAPI(
     title="Talk2Data Agent API",
     description="Convert natural language questions to SQL queries",
@@ -72,7 +72,7 @@ class DeleteSchemaResponse(BaseModel):
     success: bool
 
 
-# Note: Schema loading now handled by get_schema_parser() singleton in schema_parser.py
+
 
 @app.get("/")
 async def root():
@@ -85,14 +85,13 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for monitoring"""
     try:
-        # Test schema loading with new multi-table parser
+        
         from schema_parser import get_schema_parser
         parser = get_schema_parser("retial_star_schema")
         return {
             "status": "healthy",
-            "service": "talk2data-agent-multitable",
+            "service": "talk2data-agent",
             "timestamp": time.time(),
             "schema_loaded": bool(parser.tables),
             "tables_count": len(parser.tables),
@@ -119,18 +118,28 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         
         # Determine schema name to use
         schema_name = request.schema_name if request.schema_name else "retial_star_schema"
+        username = request.username if request.username else current_user
         
-        #Load schema from S3 for current user
-        success, schema_data = get_user_schema(current_user, schema_name)
+        # Load schema from S3 for user
+        logger.info(f"Loading schema '{schema_name}' for user '{username}' from S3")
+        success, schema_data = get_user_schema(username, schema_name)
+        
         if not success or not schema_data:
-            # Fallback to local schema for testing
-            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{current_user}', using local fallback")
-            sql_query = generate_multi_table_sql(
-                user_question=request.question.strip(),
-                schema_name=schema_name  # ← Local fallback
-            )
+            # Try local fallback only for built-in schemas
+            if schema_name in ["retial_star_schema", "rossman_schema", "hr_schema"]:
+                logger.warning(f"Schema '{schema_name}' not found in S3, using local fallback")
+                sql_query = generate_multi_table_sql(
+                    user_question=request.question.strip(),
+                    schema_name=schema_name
+                )
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Schema '{schema_name}' not found for user '{username}'. Please check the schema name or upload it first."
+                )
         else:
             # Use S3 schema
+            logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
                 schema_data=schema_data
@@ -262,7 +271,7 @@ async def service_info():
         schema_summary = parser.get_schema_summary()
         
         return {
-            "service": "Talk2Data Agent - Multi-Table",
+            "service": "Talk2Data Agent",
             "version": "2.0.0",
             "features": [
                 "Automatic table selection (LLM)",

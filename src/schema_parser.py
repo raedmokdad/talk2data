@@ -6,6 +6,7 @@ import logging
 from src.llm_table_selector import select_tables
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 @dataclass
 class TableRelationship:
@@ -14,7 +15,7 @@ class TableRelationship:
     from_column: str
     to_table: str
     to_column: str
-    join_type: str = "LEFT JOIN"  # default: left join
+    join_type: str = "LEFT JOIN"
     description: str = ""
     
     def to_sql_join(self, from_alias: str = None, to_alias:str=None):
@@ -84,9 +85,23 @@ class SchemaParser:
         """ get tables """
         if not self.schema_data:
             return
-        tables_list = self.schema_data.get("schema", {}).get("tables", {})
-        for table in tables_list:
-            self.tables[table["name"]] = table
+        
+        # Check for star schema format (multiple tables)
+        tables_list = self.schema_data.get("schema", {}).get("tables", [])
+        if tables_list:
+            for table in tables_list:
+                self.tables[table["name"]] = table
+        
+        # Check for single-table format
+        elif "table" in self.schema_data:
+            table_name = self.schema_data.get("table")
+            self.tables[table_name] = {
+                "name": table_name,
+                "role": "table",
+                "grain": "one row per record",
+                "columns": self.schema_data.get("columns", {}),
+                "notes": self.schema_data.get("notes", [])
+            }
             
             
     def _parse_notes(self):
@@ -153,19 +168,19 @@ class SchemaParser:
     
     
     def _find_relationship(self, connected_tables: Set[str], target_table: str) -> Optional[TableRelationship]:
-       # forward check
+
         for rel in self.relationships:
             if rel.from_table in connected_tables  and rel.to_table == target_table:
                 return rel
             
-        #reverse check
+
             if rel.to_table in connected_tables and rel.from_table == target_table:
                 return TableRelationship(
                     from_table=rel.to_table,
                     from_column=rel.to_column,
                     to_table=rel.from_table,
                     to_column=rel.from_column,
-                    join_type=rel.join_type,
+                    join_type="INNER JOIN",
                     description=rel.description
                 )
         return None
@@ -176,13 +191,14 @@ class SchemaParser:
         if not required_tables:
             return None
         
-        fact_table = self._find_fact_table(required_tables)
-        if not fact_table:
-            return None
+        start_table = self._find_fact_table(required_tables)
+        if not start_table:
+            start_table = required_tables[0]
         
-        remaining_tables = [table for table in required_tables if table != fact_table]  
-        connected_tables: Set[str] = {fact_table}  
-        join_path = JoinPath(tables = [fact_table], relationships=[])
+        
+        remaining_tables = [table for table in required_tables if table != start_table]  
+        connected_tables: Set[str] = {start_table}  
+        join_path = JoinPath(tables = [start_table], relationships=[])
         
         if not remaining_tables:
             return join_path
@@ -204,20 +220,80 @@ class SchemaParser:
         return join_path
     
     
+    def validate_selected_tables(self, selected_tables: List[str]) -> Tuple[bool, str]:
+        """
+        Validates if all selected tables exist in the schema.
+        """
+        if not selected_tables:
+            return False, "No tables were selected for the query"
+        
+        missing_tables = [t for t in selected_tables if t not in self.tables]
+        
+        if missing_tables:
+            available_tables = ", ".join(self.tables.keys())
+            missing = ", ".join(missing_tables)
+            return False, f"Cannot generate query: Tables '{missing}' do not exist in schema. Available tables: {available_tables}"
+        
+        return True, ""
+    
+    def validate_sql_columns(self, sql_query: str) -> Tuple[bool, str]:
+        """
+        Validates if columns used in SQL exist in the schema.
+        """
+        import re
+        
+        # Extract table.column references (e.g., dim_product.sku, fact_sales.sales_amount)
+        column_pattern = r'(\w+)\.(\w+)'
+        matches = re.findall(column_pattern, sql_query)
+        
+        invalid_columns = []
+        
+        for table_name, column_name in matches:
+          
+            if table_name.upper() in ['SELECT', 'FROM', 'WHERE', 'GROUP', 'ORDER', 'HAVING', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER']:
+                continue
+            
+          
+            if table_name not in self.tables:
+                continue  # Table validation is done elsewhere
+            
+          
+            table_columns = self.tables[table_name].get('columns', {})
+            if column_name not in table_columns:
+                invalid_columns.append(f"{table_name}.{column_name}")
+        
+        if invalid_columns:
+            invalid_str = ", ".join(invalid_columns)
+            
+            available_info = []
+            for table_name in set(m[0] for m in matches if m[0] in self.tables):
+                cols = list(self.tables[table_name].get('columns', {}).keys())
+                available_info.append(f"{table_name}: {', '.join(cols[:5])}...")
+            
+            available_str = "; ".join(available_info)
+            return False, f"Invalid columns in query: {invalid_str}. Check available columns: {available_str}"
+        
+        return True, ""
+    
+  
     def get_relevant_tables(self, question: str) -> List[str]:
         """
         Uses LLM to identify which tables are needed to answer the question.
-        If LLM return no valid values -> use all tables
+        If LLM return no valid values -> raise error
         """
         schema_summary = self.get_schema_summary()
         tables = select_tables(question, schema_summary)
         
-        # Validate that returned tables exist in schema
+
         valid_tables = [t for t in tables if t in self.tables]
+        invalid_tables = [t for t in tables if t not in self.tables]
+        
+        if invalid_tables:
+            logger.warning(f"LLM suggested non-existent tables: {invalid_tables}")
         
         if not valid_tables:
-            logger.warning(f"LLM returned no valid tables, using all tables as fallback")
-            return list(self.tables.keys())
+            available_tables = ", ".join(self.tables.keys())
+            raise ValueError(f"Cannot answer question: No matching tables found in schema. The question may require data not available in this schema. Available tables: {available_tables}")
         
         return valid_tables
     
@@ -242,24 +318,60 @@ class SchemaParser:
         
         
         return "\n".join(summary)
+    
+    def get_kpis_summary(self) -> str:
+        """
+        Creates KPI definitions for LLM prompts.
+        """
+        if not self.kpis:
+            return ""
+        
+        kpi_lines = []
+        for kpi_name, kpi_def in self.kpis.items():
+            formula = kpi_def.get("formula", "")
+            desc = kpi_def.get("description", "")
+            keywords = kpi_def.get("keywords", [])
+            
+            kpi_line = f"- {kpi_name}: {formula}"
+            if desc:
+                kpi_line += f" ({desc})"
+            if keywords:
+                kpi_line += f" [Keywords: {', '.join(keywords)}]"
+            
+            kpi_lines.append(kpi_line)
+        
+        return "Available KPIs:\n" + "\n".join(kpi_lines) if kpi_lines else ""
+    
+    def get_synonyms_summary(self) -> str:
+        """
+        Creates synonym/glossary definitions for LLM prompts.
+        """
+        if not self.synonyms:
+            return ""
+        
+        syn_lines = []
+        for term, mapping in list(self.synonyms.items())[:10]:
+            col = mapping.get("column", "")
+            table = mapping.get("table", "")
+            syn_lines.append(f"- '{term}' → {table}.{col}")
+        
+        return "Term Glossary:\n" + "\n".join(syn_lines) if syn_lines else ""
 
 
 
 
-_schema_parser_instance: Optional[SchemaParser] = None 
+ 
 
 
 def get_schema_parser(schema_name: str = "retial_star_schema") -> SchemaParser:
     """
-    Returns the singleton instance of SchemaParser.
+    Returns a new instance of SchemaParser
     """
-    global _schema_parser_instance
+
+    parser = SchemaParser(schema_name)
+    parser.load_star_schema()
     
-    if _schema_parser_instance is None:
-        _schema_parser_instance = SchemaParser(schema_name)
-        _schema_parser_instance.load_star_schema()
-    
-    return _schema_parser_instance
+    return parser
 
 
 def get_schema_parser_from_data(schema_data: Dict) -> SchemaParser:

@@ -11,7 +11,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Force reload .env - override=True forces fresh load
+
 load_dotenv(override=True)
 
 S3_BUCKET = os.getenv("S3_BUCKET")   
@@ -20,32 +20,38 @@ AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 _s3_client = None
 
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    """Extract username from AWS Cognito JWT token"""
+def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> str:
+    """Get current user from JWT token, or return default user for local development"""
+    # Local development mode - no authentication required
+    if credentials is None:
+        logger.info("No credentials provided, using default local user: raedmokdad")
+        return "raedmokdad"
+    
     try:
         token = credentials.credentials
         payload = jwt.decode(token, options={"verify_signature": False})
         username = payload.get("cognito:username") or payload.get("username")
         if not username:
-            raise HTTPException(status_code=401, detail="Username not found in token")
+            logger.warning("Username not found in token, falling back to default")
+            return "raedmokdad"
         
-        # if username is an email
         if '@' in username:
             username = username.split('@')[0]
-        # For S3 : no points only lowercase
+        
         username = username.lower().replace('.', '_')
         
         return username
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+        logger.warning(f"Token validation failed: {str(e)}, falling back to default user")
+        return "raedmokdad"
         
    
 def get_s3_client():
     global _s3_client
-    # Always create a fresh client to ensure new credentials are used
+    
     access_key = os.getenv("AWS_ACCESS_KEY_ID")
     secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
     

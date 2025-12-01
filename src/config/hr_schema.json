@@ -1,0 +1,140 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_employee_daily",
+        "role": "fact",
+        "grain": "one row per employee per day",
+        "columns": {
+          "record_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date.date_key",
+          "employee_key": "INT - Foreign key to dim_employee.employee_key",
+          "department_key": "INT - Foreign key to dim_department.department_key",
+          "hours_worked": "DECIMAL(4,2) - Number of hours worked on that day",
+          "tasks_completed": "INT - Number of tasks finished",
+          "defects_found": "INT - Number of quality defects found by employee",
+          "is_absent": "BOOLEAN - TRUE if employee was absent"
+        },
+        "primary_key": "record_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "employee_key": "dim_employee.employee_key",
+          "department_key": "dim_department.department_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per calendar date",
+        "columns": {
+          "date_key": "INT - Surrogate key, e.g. 20240131",
+          "date": "DATE - Calendar date",
+          "year": "INT - Calendar year",
+          "month": "INT - Month number (1-12)",
+          "day_name": "VARCHAR - Day name, e.g. 'Monday'",
+          "is_workday": "BOOLEAN - TRUE if it is a working day"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_employee",
+        "role": "dimension",
+        "grain": "one row per employee",
+        "columns": {
+          "employee_key": "INT - Surrogate key",
+          "employee_id": "VARCHAR - Employee ID (e.g. E123)",
+          "full_name": "VARCHAR - Full name of the employee",
+          "job_title": "VARCHAR - Job title, e.g. 'Developer', 'Analyst'",
+          "hire_date": "DATE - Date of hiring",
+          "hourly_rate": "DECIMAL(10,2) - Hourly wage in EUR"
+        },
+        "primary_key": "employee_key"
+      },
+      {
+        "name": "dim_department",
+        "role": "dimension",
+        "grain": "one row per department",
+        "columns": {
+          "department_key": "INT - Surrogate key",
+          "department_name": "VARCHAR - Name of the department, e.g. 'IT', 'HR'",
+          "cost_center": "VARCHAR - Cost center code",
+          "manager_name": "VARCHAR - Name of the department manager"
+        },
+        "primary_key": "department_key"
+      }
+    ],
+    "notes": [
+      "Star schema for HR analytics.",
+      "fact_employee_daily links to dimensions."
+    ],
+    "relationships": [
+      {
+        "from": "fact_employee_daily.date_key",
+        "to": "dim_date.date_key",
+        "join_type": "LEFT JOIN",
+        "description": "Links daily stats to date"
+      },
+      {
+        "from": "fact_employee_daily.employee_key",
+        "to": "dim_employee.employee_key",
+        "join_type": "LEFT JOIN",
+        "description": "Links daily stats to employee"
+      },
+      {
+        "from": "fact_employee_daily.department_key",
+        "to": "dim_department.department_key",
+        "join_type": "LEFT JOIN",
+        "description": "Links daily stats to department"
+      }
+    ]
+  },
+  "synonyms": {
+    "mitarbeiter": {
+      "column": "full_name",
+      "table": "dim_employee",
+      "description": "Employee Name"
+    },
+    "abteilung": {
+      "column": "department_name",
+      "table": "dim_department",
+      "description": "Department Name"
+    },
+    "arbeitsstunden": {
+      "column": "hours_worked",
+      "table": "fact_employee_daily",
+      "description": "Hours worked"
+    },
+    "aufgaben": {
+      "column": "tasks_completed",
+      "table": "fact_employee_daily",
+      "description": "Tasks completed"
+    },
+    "fehler": {
+      "column": "defects_found",
+      "table": "fact_employee_daily",
+      "description": "Defects found"
+    }
+  },
+  "kpis": {
+    "productivity": {
+      "formula": "SUM(fact_employee_daily.tasks_completed) / NULLIF(SUM(fact_employee_daily.hours_worked), 0)",
+      "description": "Tasks completed per hour",
+      "required_tables": ["fact_employee_daily"],
+      "keywords": ["produktivität", "leistung"]
+    },
+    "absenteeism_rate": {
+      "formula": "SUM(CASE WHEN fact_employee_daily.is_absent = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Percentage of days absent",
+      "required_tables": ["fact_employee_daily"],
+      "keywords": ["fehlzeitenquote", "krankenstand"]
+    },
+    "total_cost": {
+      "formula": "SUM(fact_employee_daily.hours_worked * dim_employee.hourly_rate)",
+      "description": "Total labor cost",
+      "required_tables": ["fact_employee_daily", "dim_employee"],
+      "keywords": ["personalkosten", "gesamtkosten"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

@@ -1,0 +1,109 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_transaction",
+        "role": "fact",
+        "grain": "one row per financial transaction",
+        "columns": {
+          "transaction_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "account_key": "INT - Foreign key to dim_account",
+          "customer_key": "INT - Foreign key to dim_customer",
+          "branch_key": "INT - Foreign key to dim_branch",
+          "transaction_amount": "DECIMAL(12,2) - Transaction amount",
+          "transaction_type": "VARCHAR - Transaction type",
+          "fee_amount": "DECIMAL(10,2) - Fee charged",
+          "is_fraud": "BOOLEAN - TRUE if flagged as fraud"
+        },
+        "primary_key": "transaction_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "account_key": "dim_account.account_key",
+          "customer_key": "dim_customer.customer_key",
+          "branch_key": "dim_branch.branch_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month",
+          "quarter": "INT - Quarter"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_account",
+        "role": "dimension",
+        "grain": "one row per account",
+        "columns": {
+          "account_key": "INT - Surrogate key",
+          "account_number": "VARCHAR - Account number",
+          "account_type": "VARCHAR - Account type",
+          "opening_date": "DATE - Account opening date"
+        },
+        "primary_key": "account_key"
+      },
+      {
+        "name": "dim_customer",
+        "role": "dimension",
+        "grain": "one row per customer",
+        "columns": {
+          "customer_key": "INT - Surrogate key",
+          "customer_id": "VARCHAR - Customer ID",
+          "age_group": "VARCHAR - Age group",
+          "credit_score": "INT - Credit score",
+          "segment": "VARCHAR - Customer segment"
+        },
+        "primary_key": "customer_key"
+      },
+      {
+        "name": "dim_branch",
+        "role": "dimension",
+        "grain": "one row per branch",
+        "columns": {
+          "branch_key": "INT - Surrogate key",
+          "branch_name": "VARCHAR - Branch name",
+          "city": "VARCHAR - City",
+          "region": "VARCHAR - Region"
+        },
+        "primary_key": "branch_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_transaction.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_transaction.account_key", "to": "dim_account.account_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_transaction.customer_key", "to": "dim_customer.customer_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_transaction.branch_key", "to": "dim_branch.branch_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "transaktion": {"column": "transaction_id", "table": "fact_transaction"},
+    "konto": {"column": "account_number", "table": "dim_account"},
+    "betrag": {"column": "transaction_amount", "table": "fact_transaction"}
+  },
+  "kpis": {
+    "total_volume": {
+      "formula": "SUM(fact_transaction.transaction_amount)",
+      "description": "Total transaction volume",
+      "required_tables": ["fact_transaction"]
+    },
+    "fraud_rate": {
+      "formula": "SUM(CASE WHEN fact_transaction.is_fraud = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Fraud detection rate",
+      "required_tables": ["fact_transaction"]
+    },
+    "fee_revenue": {
+      "formula": "SUM(fact_transaction.fee_amount)",
+      "description": "Total fee revenue",
+      "required_tables": ["fact_transaction"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

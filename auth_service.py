@@ -1,8 +1,3 @@
-"""
-AWS Cognito Authentication Service
-Handles user signup, login, password reset, and verification
-"""
-
 import boto3
 import os
 import hmac
@@ -10,25 +5,20 @@ import hashlib
 import base64
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
-from typing import Tuple, Union, Dict
 
 load_dotenv()
 
-# Cognito Configuration
+
 COGNITO_REGION = os.getenv('COGNITO_REGION', 'us-east-1')
 USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', 'us-east-1_1WET5qWMS')
 APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '6dst32npudvcr207ufsacfavui')
 APP_CLIENT_SECRET = os.getenv('COGNITO_APP_CLIENT_SECRET', None)
 
-# Initialize Cognito Client
+
 cognito_client = boto3.client('cognito-idp', region_name=COGNITO_REGION)
 
 
 def get_secret_hash(username: str) -> str:
-    """
-    Calculate SECRET_HASH for Cognito app client with secret
-    Required when app client has a client secret configured
-    """
     if not APP_CLIENT_SECRET:
         return None
     
@@ -39,17 +29,6 @@ def get_secret_hash(username: str) -> str:
 
 
 def signup_user(username: str, password: str, email: str) -> tuple[bool, str]:
-    """
-    Register a new user
-    
-    Args:
-        username: Unique username
-        password: User password (must meet policy requirements)
-        email: User email for verification
-    
-    Returns:
-        (success, message)
-    """
     try:
         params = {
             'ClientId': APP_CLIENT_ID,
@@ -60,7 +39,7 @@ def signup_user(username: str, password: str, email: str) -> tuple[bool, str]:
             ]
         }
         
-        # Add SECRET_HASH if client secret is configured
+        
         secret_hash = get_secret_hash(username)
         if secret_hash:
             params['SecretHash'] = secret_hash
@@ -92,6 +71,7 @@ def confirm_signup(username: str, confirmation_code: str) -> tuple[bool, str]:
     Returns:
         (success, message)
     """
+def confirm_signup(username: str, confirmation_code: str) -> tuple[bool, str]:
     try:
         params = {
             'ClientId': APP_CLIENT_ID,
@@ -143,17 +123,7 @@ def resend_confirmation_code(username: str) -> tuple[bool, str]:
         return False, f"Failed to resend code: {e.response['Error']['Message']}"
 
 
-def login_user(username: str, password: str) -> Tuple[bool, Union[Dict, str]]:
-    """
-    Authenticate user and get tokens
-    
-    Args:
-        username: Username
-        password: User password
-    
-    Returns:
-        (success, tokens_dict or error_message)
-    """
+def login_user(username: str, password: str) -> tuple[bool, dict | str]:
     try:
         auth_params = {
             'USERNAME': username,
@@ -170,7 +140,7 @@ def login_user(username: str, password: str) -> Tuple[bool, Union[Dict, str]]:
             AuthParameters=auth_params
         )
         
-        # Return authentication tokens
+        
         auth_result = response['AuthenticationResult']
         return True, {
             'access_token': auth_result['AccessToken'],
@@ -191,17 +161,6 @@ def login_user(username: str, password: str) -> Tuple[bool, Union[Dict, str]]:
 
 
 def change_password(access_token: str, old_password: str, new_password: str) -> tuple[bool, str]:
-    """
-    Change user password
-    
-    Args:
-        access_token: User's access token from login
-        old_password: Current password
-        new_password: New password
-    
-    Returns:
-        (success, message)
-    """
     try:
         cognito_client.change_password(
             AccessToken=access_token,
@@ -221,15 +180,6 @@ def change_password(access_token: str, old_password: str, new_password: str) -> 
 
 
 def forgot_password(username: str) -> tuple[bool, str]:
-    """
-    Initiate password reset flow
-    
-    Args:
-        username: Username to reset password for
-    
-    Returns:
-        (success, message)
-    """
     try:
         params = {
             'ClientId': APP_CLIENT_ID,
@@ -249,14 +199,6 @@ def forgot_password(username: str) -> tuple[bool, str]:
 def confirm_forgot_password(username: str, confirmation_code: str, new_password: str) -> tuple[bool, str]:
     """
     Complete password reset with confirmation code
-    
-    Args:
-        username: Username
-        confirmation_code: Code sent to user's email
-        new_password: New password
-    
-    Returns:
-        (success, message)
     """
     try:
         params = {
@@ -288,11 +230,7 @@ def confirm_forgot_password(username: str, confirmation_code: str, new_password:
 def logout_user(access_token: str) -> tuple[bool, str]:
     """
     Sign out user globally (invalidate tokens)
-    
-    Args:
-        access_token: User's access token
-    
-    Returns:
+
         (success, message)
     """
     try:
@@ -304,15 +242,10 @@ def logout_user(access_token: str) -> tuple[bool, str]:
         return False, f"Logout failed: {e.response['Error']['Message']}"
 
 
-def get_user_info(access_token: str) -> Tuple[bool, Union[Dict, str]]:
+def get_user_info(access_token: str) -> tuple[bool, dict | str]:
     """
     Get authenticated user's information
-    
-    Args:
-        access_token: User's access token
-    
-    Returns:
-        (success, user_info_dict or error_message)
+
     """
     try:
         response = cognito_client.get_user(

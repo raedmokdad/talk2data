@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Lazy initialization - OpenAI client created on first use
 _client = None
 
 def get_openai_client():
-    """Get or create OpenAI client - Railway compatible"""
+    """
+    Get or create OpenAI client - Railway compatible"""
     global _client
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -44,6 +44,7 @@ def select_tables(question: str, schema_summary: str) -> List[str]:
         prompt_template = load_prompt("table_selector")
         
         prompt = prompt_template.format(question = question, schema_summary = schema_summary)
+      
         
         client = get_openai_client()
         response = client.chat.completions.create(
@@ -53,7 +54,13 @@ def select_tables(question: str, schema_summary: str) -> List[str]:
         )
         
         content = response.choices[0].message.content.strip()
+        
+     
+        if "```" in content:
+            content = content.replace("```json", "").replace("```", "").strip()
+      
         tables = json.loads(content)
+       
         
         return tables
     

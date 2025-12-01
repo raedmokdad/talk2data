@@ -10,17 +10,17 @@ from mapping import MappingOutput
 from pydantic import ValidationError
 
 
-# Configure logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
+
 load_dotenv()
 
-# Validate and initialize OpenAI client
+
 _api_key = os.getenv("OPENAI_API_KEY")
 if not _api_key:
     raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -29,19 +29,6 @@ client = OpenAI(api_key=_api_key)
 
 
 def load_prompt(path: str) -> str:
-    """
-    Loads a text prompt template from a file.
-
-    Args:
-        path (str): The file path to the prompt template.
-
-    Returns:
-        str: The full text content of the prompt file.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
-        IOError: If the file cannot be read for any other reason.
-    """
     if not path:
         raise ValueError("Path cannot be empty")
     
@@ -65,22 +52,7 @@ def build_prompt(
     top_matches: List[Tuple[str, float]], 
     queries_dict: Dict[str, Dict]
 ) -> str:
-    """
-    Builds the full LLM prompt by injecting user question and top-matching query descriptions.
-
-    Args:
-        prompt_template (str): The prompt string with placeholders.
-        user_text (str): The original user question.
-        top_matches (List[Tuple[str, float]]): Top query keys with similarity scores.
-        queries_dict (dict): Full content of queries.json.
-
-    Returns:
-        str: The formatted prompt ready to send to LLM.
-        
-    Raises:
-        ValueError: If no valid query descriptions found or inputs are invalid.
-    """
-    # Input validation
+    
     if not prompt_template or not prompt_template.strip():
         raise ValueError("prompt_template cannot be empty")
     if not user_text or not user_text.strip():
@@ -117,21 +89,7 @@ def build_prompt(
     
 
 def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 0.0) -> str:
-    """
-    Sends the prompt to the OpenAI LLM and returns the raw text response.
-
-    Args:
-        prompt (str): The prompt to send.
-        model (str, optional): The model to use. Defaults to 'gpt-4o'.
-        temperature (float, optional): Sampling temperature. Defaults to 0.0.
-
-    Returns:
-        str: Raw response text from the model.
-
-    Raises:
-        ValueError: If prompt is empty.
-        RuntimeError: If the LLM call fails or response is empty.
-    """
+    
     if not prompt or not prompt.strip():
         raise ValueError("Prompt cannot be empty")
     
@@ -159,30 +117,17 @@ def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 0.0)
         raise RuntimeError(f"LLM call failed: {e}") from e
 
 def parse_response(raw_text: str) -> dict:
-    """
-    Extracts and parses JSON from a raw LLM response.
-    
-    Args:
-        raw_text (str): Raw text returned by the LLM.
-
-    Returns:
-        dict: Parsed JSON object.
-
-    Raises:
-        ValueError: If raw_text is empty.
-        RuntimeError: If valid JSON cannot be extracted.
-    """
     if not raw_text or not raw_text.strip():
         raise ValueError("raw_text cannot be empty")
     
-    # First attempt - direct parse
+    
     try:
         return json.loads(raw_text)
     except json.JSONDecodeError:
         logger.warning("Direct JSON parse failed. Trying regex fallback.")
     
-    # Second attempt - regex extract with improved pattern
-    # Match outermost JSON object, avoiding greedy matching
+    
+    
     match = re.search(r'\{(?:[^{}]|(?:\{[^{}]*\}))*\}', raw_text, re.DOTALL)
     if not match:
         logger.error(f"No JSON object found in LLM response. Response: {raw_text[:200]}")
@@ -196,18 +141,6 @@ def parse_response(raw_text: str) -> dict:
         
         
 def validate_llm_response(data: dict) -> dict:
-    """
-    Validates the parsed LLM response using Pydantic schema.
-
-    Args:
-        data (dict): JSON dict from LLM.
-
-    Returns:
-        dict: Validated and normalized version.
-
-    Raises:
-        ValueError: If structure or types are wrong.
-    """
     try:
         validated = MappingOutput(**data)
         return validated.model_dump()
@@ -226,22 +159,7 @@ def validate_and_retry(
     max_retries: int = 3, 
     retry_delay: float = 1.0
 ) -> dict:
-    """
-    Calls LLM with a prompt, parses and validates the result.
-    Retries with feedback if validation fails.
-
-    Args:
-        prompt (str): Initial LLM prompt.
-        max_retries (int): Maximum retry attempts. Defaults to 3.
-        retry_delay (float): Delay between retries in seconds. Defaults to 1.0.
-
-    Returns:
-        dict: Validated query mapping with query_key and params.
-
-    Raises:
-        ValueError: If prompt is empty or max_retries is invalid.
-        RuntimeError: If validation fails after max_retries.
-    """
+    
     if not prompt or not prompt.strip():
         raise ValueError("prompt cannot be empty")
     if max_retries < 1:
@@ -264,7 +182,7 @@ def validate_and_retry(
             logger.warning(f"Attempt {attempt}/{max_retries} failed: {e}")
             
             if attempt < max_retries:
-                # Provide feedback to LLM for next attempt
+            
                 prompt = (
                     original_prompt +
                     f"\n\nYour previous response could not be validated.\n"

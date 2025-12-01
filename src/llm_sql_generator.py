@@ -5,19 +5,19 @@ import pathlib
 from dotenv import load_dotenv
 from typing import Dict, Tuple, Optional
 import logging
-from src.schema_parser import get_schema_parser
+from src.schema_parser import get_schema_parser, get_schema_parser_from_data
 from src.date_converter import extract_and_convert_dates
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 load_dotenv()
 
-# Lazy initialization - OpenAI client created on first use
+
 _client = None
 
 def get_openai_client():
-    """Get or create OpenAI client - Railway compatible"""
     global _client
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -35,7 +35,6 @@ _validation_feedback_prompt = None
 
 
 def load_prompt(prompt_name: str) -> str:
-    """Load prompt template from the prompts folder"""
     script_dir = pathlib.Path(__file__).parent.parent
     prompt_path = script_dir / "prompts" / f"{prompt_name}.txt"
     
@@ -44,7 +43,6 @@ def load_prompt(prompt_name: str) -> str:
 
 
 def load_sql_prompts():
-    """Loads all SQL prompts, cached after first call"""
     global _system_prompt, _user_prompt, _confidence_prompt, _validation_feedback_prompt
     
     if _system_prompt is None:
@@ -65,7 +63,6 @@ def load_sql_prompts():
 
 
 def load_rossmann_schema(path: str = None) -> Dict:
-    """Load schema for Rossmann dataset, use default path if none is given"""
     global _rossman_schema   
 
     if _rossman_schema is not None:
@@ -81,15 +78,12 @@ def load_rossmann_schema(path: str = None) -> Dict:
 
 
 def extract_validator_rules(validator) -> Dict[str, str]:
-    """Gets the validation rules to use in prompt"""
     
     forbidden_commands = ", ".join(validator.forbidden_commands)
     allowed_functions = ", ".join(validator.allowed_functions)
     
-    # Extract dangerous patterns (user-friendly descriptions)
     dangerous_patterns = []
     for pattern, description in validator.pattern_labels.items():
-        # Simplify technical regex descriptions for LLM
         if "Comment" in description:
             dangerous_patterns.append("Comments (-- or /* */)")
         elif "injection" in description.lower():
@@ -99,7 +93,7 @@ def extract_validator_rules(validator) -> Dict[str, str]:
         else:
             dangerous_patterns.append(description)
     
-    dangerous_patterns_text = "; ".join(set(dangerous_patterns))  # Remove duplicates
+    dangerous_patterns_text = "; ".join(set(dangerous_patterns))  
     
     return {
         "forbidden_commands": forbidden_commands,
@@ -109,7 +103,6 @@ def extract_validator_rules(validator) -> Dict[str, str]:
         
 
 def generate_sql_query(user_question: str, rossmann_schema: dict = None, validator=None) -> str:
-    """Generates SQL query from user question in natural language"""
 
     if rossmann_schema is None:
         rossmann_schema = load_rossmann_schema()
@@ -123,7 +116,6 @@ def generate_sql_query(user_question: str, rossmann_schema: dict = None, validat
     if validator:
         validator_rules = extract_validator_rules(validator)
     else:
-        # Default  rules
         validator_rules = {
             "forbidden_commands": "INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, MERGE, REPLACE, EXEC, CALL, GRANT, REVOKE",
             "allowed_functions": "SUM, AVG, COUNT, MIN, MAX, DATE, DATE_TRUNC, COALESCE, YEAR, MONTH",
@@ -152,11 +144,8 @@ def generate_sql_query(user_question: str, rossmann_schema: dict = None, validat
         
         sql_query = response.choices[0].message.content.strip()
         
-
-        if sql_query.startswith("```sql"):
-            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
-        if sql_query.startswith("```"):
-            sql_query = sql_query.replace("```", "").strip()
+        if "```" in sql_query:
+            sql_query = sql_query.replace("```sql", "").replace("```json", "").replace("```", "").strip()
             
         return sql_query
         
@@ -166,7 +155,6 @@ def generate_sql_query(user_question: str, rossmann_schema: dict = None, validat
 
 
 def assess_sql_confidence(user_question: str, generated_sql: str) -> float:
-    """Checks confidence score for generated SQL, returns value between 0 and 1"""
     try:
 
         _, _, confidence_template, _ = load_sql_prompts()
@@ -181,7 +169,7 @@ def assess_sql_confidence(user_question: str, generated_sql: str) -> float:
             messages=[
                 {"role": "user", "content": confidence_prompt}
             ],
-            temperature=0,  # Deterministic assessment
+            temperature=0,  
             max_tokens=50
         )
 
@@ -196,7 +184,6 @@ def assess_sql_confidence(user_question: str, generated_sql: str) -> float:
 
 
 def provide_validation_feedback(user_question: str, failed_sql: str, validation_errors: str, rossmann_schema: dict = None) -> str:
-    """Try to fix the SQL when validation fails"""
     try:
 
         if rossmann_schema is None:
@@ -204,7 +191,6 @@ def provide_validation_feedback(user_question: str, failed_sql: str, validation_
             
         _, _, _, feedback_template = load_sql_prompts()
         
-        # build validation dict to use it in prompt
         validator_rules = {
             "forbidden_commands": "INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, MERGE, REPLACE, EXEC, CALL, GRANT, REVOKE",
             "allowed_functions": "SUM, AVG, COUNT, MIN, MAX, DATE, DATE_TRUNC, COALESCE, YEAR, MONTH, ROUND, UPPER, LOWER, SUBSTR, LENGTH, TRIM, DAY",
@@ -230,10 +216,8 @@ def provide_validation_feedback(user_question: str, failed_sql: str, validation_
         
         improved_sql = response.choices[0].message.content.strip()
         
-        # Check if the improved SQL is identical to the failed one
         if improved_sql.strip() == failed_sql.strip():
             logger.warning("LLM returned identical SQL, adding retry context")
-            # Add this info to the prompt and tr again with more temerature felxiblity
             retry_prompt = feedback_prompt + f"\n\nIMPORTANT: You returned the exact same SQL again: {failed_sql}\nPlease provide a DIFFERENT approach or query structure."
             
             retry_response = get_openai_client().chat.completions.create(
@@ -246,11 +230,10 @@ def provide_validation_feedback(user_question: str, failed_sql: str, validation_
             )
             improved_sql = retry_response.choices[0].message.content.strip()
         
-        if improved_sql.startswith("```sql"):
-            improved_sql = improved_sql.replace("```sql", "").replace("```", "").strip()
-        if improved_sql.startswith("```"):
-            improved_sql = improved_sql.replace("```", "").strip()
-            
+        if "```" in improved_sql:
+            improved_sql = improved_sql.replace("```sql", "").replace("```json", "").replace("```", "").strip()
+        
+       
         return improved_sql
         
     except Exception as e:
@@ -259,16 +242,13 @@ def provide_validation_feedback(user_question: str, failed_sql: str, validation_
 
 
 def generate_sql_with_validation(user_question: str, validator, rossmann_schema: dict = None, max_retries: int = 3, confidence_threshold: float = 0.7) -> Tuple[str, float, bool]:
-    """Generate SQL with validation, retry when it fails or confidence too low"""
     
     for attempt in range(max_retries + 1):  
         if attempt == 0:
             sql_query = generate_sql_query(user_question, rossmann_schema, validator)
         else:
-            # Generate  SQL based on previous  errors
             sql_query = provide_validation_feedback(user_question, previous_sql, validation_errors, rossmann_schema)
         
-        #Validate the SQL result
         validation_result = validator.validate(sql_query)
         validation_passed = validation_result.get("ok", False)
         
@@ -283,49 +263,29 @@ def generate_sql_with_validation(user_question: str, validator, rossmann_schema:
                 logger.error("Maximum retries reached, returning last SQL with validation failure")
                 return sql_query, 0.0, False
         
-        # Assess confidence
         confidence_score = assess_sql_confidence(user_question, sql_query)
         
-        # Check if confidence < threshold
         if confidence_score >= confidence_threshold:
             return sql_query, confidence_score, True
         else:
             if attempt < max_retries:
-                # validation error -> confidence
                 previous_sql = sql_query
                 validation_errors = f"Low confidence score: {confidence_score:.2f}. Please improve the SQL query to better match the user's question."
                 continue
             else:
-                return sql_query, confidence_score, True  # Validation passed but low confidence
+                return sql_query, confidence_score, True  
     
     return sql_query, confidence_score, validation_passed
 
 
-def generate_multi_table_sql(user_question: str, schema_name: str = None , schema_data: Dict = None ) -> str:
-    """
-    Generates SQL query with automatic table selection and JOIN generation.
-    
-    This function:
-    1. Uses LLM to identify relevant tables for the question
-    2. Algorithmically generates JOINs between selected tables
-    3. Builds comprehensive schema info including JOIN paths
-    4. Calls LLM to generate complete SQL with proper JOINs
-    
-    Args:
-        user_question: Natural language question from user
-        schema_name: Name of the star schema to use (default: "retial_star_schema")
-        validator: Optional SQL validator for security checks
-    
-    Returns:
-        Generated SQL query string with JOINs
-    """
+def generate_multi_table_sql(user_question: str, schema_name: str = None , schema_data: Dict = None, validator=None ) -> str:
     try:
-        # 0. Preprocess: Convert dates to ISO format
+      
         processed_question = extract_and_convert_dates(user_question)
         if processed_question != user_question:
             logger.info(f"Date conversion applied:\nOriginal: {user_question}\nProcessed: {processed_question}")
         
-        # 1. Load schema via singleton
+     
         if schema_data:
             parser = get_schema_parser_from_data(schema_data)
         elif schema_name:
@@ -333,22 +293,25 @@ def generate_multi_table_sql(user_question: str, schema_name: str = None , schem
         else:
             raise ValueError("Both schema_data and schema_name are not available")
         
-        # 2. Get relevant tables (LLM decides which tables needed)
+      
         relevant_tables = parser.get_relevant_tables(processed_question)
         logger.info(f"Selected tables: {relevant_tables}")
         
         if not relevant_tables:
             raise ValueError("No relevant tables identified for the question")
         
-        # 3. Find JOIN path (algorithm generates JOINs)
+        # Validate that all selected tables actually exist in schema
+        is_valid, error_msg = parser.validate_selected_tables(relevant_tables)
+        if not is_valid:
+            raise ValueError(error_msg)
+       
         join_path = parser.find_join_path(relevant_tables)
         
         if join_path is None and len(relevant_tables) > 1:
             logger.error(f"Could not find JOIN path for tables: {relevant_tables}")
             raise ValueError("Unable to connect selected tables with JOINs")
         
-        # 4. Build schema information for LLM
-        # Get detailed info for each selected table
+        
         tables_info = []
         for table_name in relevant_tables:
             table_data = parser.tables.get(table_name, {})
@@ -362,13 +325,13 @@ def generate_multi_table_sql(user_question: str, schema_name: str = None , schem
         
         schema_info = "\n\n".join(tables_info)
         
-        # 5. Build JOIN SQL
+       
         join_sql = ""
         if join_path and join_path.relationships:
             join_sql = join_path.to_sql()
             logger.info(f"Generated JOINs:\n{join_sql}")
         
-        # 6. Get validator rules
+       
         validator_rules = {}
         if validator:
             validator_rules = extract_validator_rules(validator)
@@ -379,7 +342,10 @@ def generate_multi_table_sql(user_question: str, schema_name: str = None , schem
                 "dangerous_patterns": "Comments, SQL injection patterns, Command chaining, UNION operations"
             }
         
-        # 7. Build prompt for LLM
+        
+        kpis_info = parser.get_kpis_summary()
+        synonyms_info = parser.get_synonyms_summary()
+        
         system_prompt = f"""You are an expert SQL query generator for a star schema database.
 
 Available Tables and Schema:
@@ -389,23 +355,37 @@ JOIN Structure:
 The tables are connected with the following JOINs:
 {join_sql if join_sql else "Single table query - no JOINs needed"}
 
+{kpis_info}
+
+{synonyms_info}
+
 Security Rules:
 - FORBIDDEN commands: {validator_rules['forbidden_commands']}
 - ALLOWED functions: {validator_rules['allowed_functions']}
 - AVOID: {validator_rules['dangerous_patterns']}
 
-Instructions:
+
+CRITICAL Instructions:
 1. Use the provided JOIN structure in your FROM clause
 2. Generate a complete, valid SQL query
-3. Use only the columns available in the schema above
-4. Follow proper SQL syntax and best practices
-5. For date filters, use the ISO format dates provided in the question
-6. Return ONLY the SQL query, no explanations
+3. Use ONLY the columns listed in the schema above - NO OTHER COLUMNS EXIST
+4. For KPIs, use the formulas provided in the KPI section above.
+5. Check the Term Glossary for synonym mappings to map user terms to schema columns.
+6. If the question asks for DATA that is NOT in the available columns AND NOT calculable from KPIs, you MUST respond with exactly: "ERROR: Required data not available in schema"
+7. Follow proper SQL syntax and best practices
+8. For date filters, use the ISO format dates provided in the question
+9. Return ONLY the SQL query (or the ERROR message), no explanations
+
+IMPORTANT - What counts as "missing data":
+- Asking for a METRIC or COLUMN that is not in the schema/KPIs → ERROR
+- Asking for a concept that requires data not present in the tables → ERROR
+- Do NOT invent formulas for metrics if they are not defined in the KPI section → ERROR
+- CRITICAL: Asking for specific FILTER VALUES is ALWAYS VALID. If the user mentions a specific value (like "Berlin", "ABC123", "Finance", "2024-01-15"), this is a filter value for a WHERE clause, NOT a column name. As long as the corresponding column exists (e.g., city, sku, department_name, date), generate the query. Do NOT return ERROR just because you don't see "Berlin" or "ABC123" in the schema description.
 """
         
         user_prompt = f"Generate a SQL query to answer this question: {processed_question}"
         
-        # 8. Call LLM
+        
         response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -418,11 +398,20 @@ Instructions:
         
         sql_query = response.choices[0].message.content.strip()
         
-        # 9. Clean up SQL formatting
-        if sql_query.startswith("```sql"):
-            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
-        if sql_query.startswith("```"):
-            sql_query = sql_query.replace("```", "").strip()
+
+        if "```" in sql_query:
+                       sql_query = sql_query.replace("```sql", "").replace("```json", "").replace("```", "").strip()
+       
+        
+        if sql_query.startswith("ERROR:"):
+            error_message = sql_query.replace("ERROR:", "").strip()
+            logger.warning(f"LLM detected missing data: {error_message}")
+            raise ValueError(f"Cannot answer question: {error_message}")
+        
+        is_valid, error_msg = parser.validate_sql_columns(sql_query)
+        if not is_valid:
+            logger.warning(f"Column validation failed: {error_msg}")
+            return None
         
         logger.info(f"Generated SQL:\n{sql_query}")
         return sql_query

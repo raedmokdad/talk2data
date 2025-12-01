@@ -78,10 +78,17 @@ def build_sqlalchemy_engine(selection: DBSelection) -> Engine:
         f"{driver}://{selection.user}:{selection.password}"
         f"@{selection.host}:{port}/{selection.database}"
     )
+    
+    # Für PostgreSQL mit deutschen Locale (lc_messages = German_Germany.1252):
+    # Fehlermeldungen kommen in Windows-1252, daher client_encoding auf WIN1252 setzen
+    connect_args = {}
+    if selection.db_type in (DBType.POSTGRES, DBType.REDSHIFT):
+        connect_args = {"options": "-c client_encoding=WIN1252"}
 
     engine = create_engine(
         url,
         pool_pre_ping=True,
         pool_recycle=300,
+        connect_args=connect_args,
     )
     return engine

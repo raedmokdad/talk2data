@@ -15,7 +15,7 @@ assert LOCAL_PATH.exists(), f"{LOCAL_PATH} not found"
 
 
 stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
-key = f"{KEY_PREFIX}/embeddings.json" #key = f"{KEY_PREFIX}/embeddings-{stamp}.json"
+key = f"{KEY_PREFIX}/embeddings.json" 
 s3 = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
@@ -23,8 +23,6 @@ s3 = boto3.client(
     region_name=AWS_REGION
 )
 
-#print("Werte aus der .env-Datei:", dotenv_values(".env"))  # Zeigt alle Werte aus der .env-Datei
-#print("Geladener AWS_SECRET_ACCESS_KEY:", os.getenv("AWS_SECRET_ACCESS_KEY"))  # Zeigt den geladenen Wert
 
 s3.upload_file(
     Filename=str(LOCAL_PATH),

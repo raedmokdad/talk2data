@@ -3,6 +3,7 @@ Schema Builder Dashboard for Talk2Data
 Create and manage star schema JSON files with visual interface
 """
 from __future__ import annotations
+
 import streamlit as st
 import json
 import os
@@ -11,8 +12,6 @@ from datetime import datetime
 from typing import Dict, List, Any
 import sys
 import requests
-import os
-from pathlib import Path
 from typing import List
 import pandas as pd
 from src.models import DBType, DBSelection, FileItem, FileType
@@ -232,7 +231,7 @@ if AUTH_AVAILABLE and not st.session_state.authenticated:
         st.markdown("### Quick Start")
         if st.button("🚀 Skip Login (Demo Mode)", use_container_width=True):
             st.session_state.authenticated = True
-            st.session_state.username = "raedmokdad"  # Fixed: Match S3 username
+            st.session_state.username = "raedmokdad"
             st.rerun()
     st.stop()
 
@@ -263,665 +262,733 @@ with col_h3:
             st.session_state.user_tokens = None
             st.rerun()
 
-# Sidebar for schema management
-st.sidebar.header("📋 Schema Management")
+# ============================================================================
+# MODUS-AUSWAHL
+# ============================================================================
+st.sidebar.title("🎯 Modus")
+app_mode = st.sidebar.radio(
+    "Wähle eine Funktion:",
+    ["📝 Schema Builder", "🔍 Database Query"],
+    label_visibility="collapsed"
+)
+st.sidebar.markdown("---")
+
+# ============================================================================
+# SCHEMA BUILDER MODUS
+# ============================================================================
+if app_mode == "📝 Schema Builder":
+    # Sidebar for schema management
+    st.sidebar.header("📋 Schema Management")
 
 # Load from S3
-st.sidebar.subheader("☁️ Load from S3")
-try:
-    from src.s3_service import list_user_schema, get_user_schema
+    st.sidebar.subheader("☁️ Load from S3")
+    try:
+        from src.s3_service import list_user_schema, get_user_schema
     
-    # Use raedmokdad as default username to match S3 structure
-    username = st.session_state.username or "raedmokdad"
+        # Use raedmokdad as default username to match S3 structure
+        username = st.session_state.username or "raedmokdad"
     
-    col_s3_a, col_s3_b = st.sidebar.columns([3, 1])
+        col_s3_a, col_s3_b = st.sidebar.columns([3, 1])
     
-    with col_s3_b:
-        if st.button("🔄", help="Refresh schemas from S3"):
-            st.rerun()
+        with col_s3_b:
+            if st.button("🔄", help="Refresh schemas from S3"):
+                st.rerun()
     
-    with col_s3_a:
-        with st.spinner("Loading from S3..."):
-            success, s3_schemas = list_user_schema(username)
+        with col_s3_a:
+            with st.spinner("Loading from S3..."):
+                success, s3_schemas = list_user_schema(username)
             
-            # Debug info
-            st.sidebar.caption(f"🔍 User: '{username}' | Success: {success} | Found: {len(s3_schemas) if s3_schemas else 0} schemas")
+                # Debug info
+                st.sidebar.caption(f"🔍 User: '{username}' | Success: {success} | Found: {len(s3_schemas) if s3_schemas else 0} schemas")
             
-            if success and s3_schemas:
-                selected_s3_schema = st.selectbox(
-                    "Your Schemas:",
-                    options=["-- Select Schema --"] + s3_schemas,
-                    key="s3_schema_selector"
-                )
+                if success and s3_schemas:
+                    selected_s3_schema = st.selectbox(
+                        "Your Schemas:",
+                        options=["-- Select Schema --"] + s3_schemas,
+                        key="s3_schema_selector"
+                    )
                 
-                if selected_s3_schema != "-- Select Schema --":
-                    if st.button("📥 Load Selected", use_container_width=True):
-                        with st.spinner(f"Loading {selected_s3_schema}..."):
-                            load_success, schema_data = get_user_schema(username, selected_s3_schema)
+                    if selected_s3_schema != "-- Select Schema --":
+                        if st.button("📥 Load Selected", use_container_width=True):
+                            with st.spinner(f"Loading {selected_s3_schema}..."):
+                                load_success, schema_data = get_user_schema(username, selected_s3_schema)
                             
-                            if load_success:
-                                st.session_state.schema_data = schema_data
-                                st.session_state.current_schema_name = selected_s3_schema
-                                st.sidebar.success(f"✅ Loaded: {selected_s3_schema}")
-                                st.rerun()
-                            else:
-                                st.sidebar.error(f"❌ Failed to load schema")
-            elif success:
-                st.sidebar.info(f"No schemas on S3 for user: {username}")
-            else:
-                st.sidebar.warning("S3 not configured or error")
+                                if load_success:
+                                    st.session_state.schema_data = schema_data
+                                    st.session_state.current_schema_name = selected_s3_schema
+                                    st.sidebar.success(f"✅ Loaded: {selected_s3_schema}")
+                                    st.rerun()
+                                else:
+                                    st.sidebar.error(f"❌ Failed to load schema")
+                elif success:
+                    st.sidebar.info(f"No schemas on S3 for user: {username}")
+                else:
+                    st.sidebar.warning("S3 not configured or error")
                 
-except Exception as e:
-    st.sidebar.error(f"⚠️ S3 error: {str(e)}")
+    except Exception as e:
+        st.sidebar.error(f"⚠️ S3 error: {str(e)}")
 
-st.sidebar.markdown("---")
+    st.sidebar.markdown("---")
 
-# Load template button
-if st.sidebar.button("📥 Load Retail Template", use_container_width=True):
-    template = load_schema_template()
-    if template:
-        st.session_state.schema_data = template
-        st.session_state.current_schema_name = "retial_star_schema"
-        st.sidebar.success("Template loaded!")
+    # Load template button
+    if st.sidebar.button("📥 Load Retail Template", use_container_width=True):
+        template = load_schema_template()
+        if template:
+            st.session_state.schema_data = template
+            st.session_state.current_schema_name = "retial_star_schema"
+            st.sidebar.success("Template loaded!")
+            st.rerun()
+
+    # New schema button
+    if st.sidebar.button("🆕 New Empty Schema", use_container_width=True):
+        st.session_state.schema_data = {
+            "schema": {
+                "tables": [],
+                "relationships": [],
+                "metrics": {},
+                "examples": [],
+                "glossary": {}
+            }
+        }
+        st.session_state.current_schema_name = "new_schema"
+        st.sidebar.success("New schema created!")
         st.rerun()
 
-# New schema button
-if st.sidebar.button("🆕 New Empty Schema", use_container_width=True):
-    st.session_state.schema_data = {
-        "schema": {
-            "tables": [],
-            "relationships": [],
-            "metrics": {},
-            "examples": [],
-            "glossary": {}
-        }
+    # Schema name input
+    schema_name = st.sidebar.text_input(
+        "Schema Name", 
+        value=st.session_state.current_schema_name,
+        key="schema_name_input"
+    )
+    st.session_state.current_schema_name = schema_name
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("💾 Save Options")
+
+    # Save locally
+    if st.sidebar.button("💾 Save Locally", use_container_width=True):
+        save_schema_locally(st.session_state.schema_data, schema_name)
+
+    # Save to S3
+    if st.sidebar.button("☁️ Upload to S3", use_container_width=True):
+        username = st.session_state.username or "raedmokdad"
+        success = upload_schema_to_s3(st.session_state.schema_data, schema_name, username)
+        if success:
+            st.sidebar.info("💡 Reload to see in S3 list")
+
+    # Download button
+    schema_json = json.dumps(st.session_state.schema_data, indent=2)
+    st.sidebar.download_button(
+        label="📥 Download JSON",
+        data=schema_json,
+        file_name=f"{schema_name}.json",
+        mime="application/json",
+        use_container_width=True
+    )
+
+    # Upload JSON file to S3
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("📤 Upload JSON File to S3"):
+        uploaded_file = st.file_uploader(
+            "Choose a JSON schema file",
+            type=['json'],
+            key="json_uploader",
+            help="Upload a local JSON schema file to S3"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # Read the uploaded JSON file
+                file_content = uploaded_file.read()
+                schema_data = json.loads(file_content)
+                
+                # Preview the schema
+                st.caption(f"📄 File: {uploaded_file.name}")
+                with st.expander("Preview JSON"):
+                    st.json(schema_data)
+                
+                # Schema name input
+                default_name = uploaded_file.name.replace('.json', '')
+                upload_name = st.text_input(
+                    "Schema name for S3:",
+                    value=default_name,
+                    key="upload_json_name"
+                )
+                
+                # Upload button
+                if st.button("☁️ Upload to S3", use_container_width=True, key="upload_json_btn"):
+                    username = st.session_state.username or "raedmokdad"
+                    success = upload_schema_to_s3(schema_data, upload_name, username)
+                    if success:
+                        st.success(f"✅ '{upload_name}' uploaded to S3!")
+                        st.info("💡 Click 'Reload to see in S3 list' to refresh")
+            
+            except json.JSONDecodeError as e:
+                st.error(f"❌ Invalid JSON file: {str(e)}")
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+    
+    # Delete from S3
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("🗑️ Delete from S3"):
+        try:
+            from src.s3_service import delete_user_schema, list_user_schema
+        
+            username = st.session_state.username or "raedmokdad"
+            success, s3_schemas = list_user_schema(username)
+        
+            if success and s3_schemas:
+                schema_to_delete = st.selectbox(
+                    "Select schema to delete:",
+                    options=s3_schemas,
+                    key="delete_schema_selector"
+                )
+            
+                if st.button("🗑️ Delete Selected", type="secondary", use_container_width=True):
+                    if st.checkbox("Confirm deletion", key="confirm_delete"):
+                        del_success, del_message = delete_user_schema(username, schema_to_delete)
+                        if del_success:
+                            st.success(del_message)
+                            st.rerun()
+                        else:
+                            st.error(del_message)
+            else:
+                st.info("No schemas to delete")
+        except Exception as e:
+            st.warning("S3 not available")
+
+# ============================================================================
+# DATABASE QUERY MODUS
+# ============================================================================
+else:  # app_mode == "🔍 Database Query"
+    # --- Sidebar: Data source selection ---
+    st.sidebar.header("🔌 Data Source")
+
+    db_type_label_to_enum = {
+        "PostgreSQL": DBType.POSTGRES,
+        "MySQL": DBType.MYSQL,
+        "Amazon Redshift": DBType.REDSHIFT,
+        "CSV / Excel Files": DBType.FILES,
     }
-    st.session_state.current_schema_name = "new_schema"
-    st.sidebar.success("New schema created!")
-    st.rerun()
 
-# Schema name input
-schema_name = st.sidebar.text_input(
-    "Schema Name", 
-    value=st.session_state.current_schema_name,
-    key="schema_name_input"
-)
-st.session_state.current_schema_name = schema_name
+    db_choice = st.sidebar.selectbox(
+        "Select data source type",
+        list(db_type_label_to_enum.keys()),
+    )
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("💾 Save Options")
+    selected_db_type = db_type_label_to_enum[db_choice]
 
-# Save locally
-if st.sidebar.button("💾 Save Locally", use_container_width=True):
-    save_schema_locally(st.session_state.schema_data, schema_name)
+    selection_kwargs = {"db_type": selected_db_type}
 
-# Save to S3
-if st.sidebar.button("☁️ Upload to S3", use_container_width=True):
-    username = st.session_state.username or "raedmokdad"
-    success = upload_schema_to_s3(st.session_state.schema_data, schema_name, username)
-    if success:
-        st.sidebar.info("💡 Reload to see in S3 list")
+    # SQL DB configuration
+    if selected_db_type in {DBType.POSTGRES, DBType.MYSQL, DBType.REDSHIFT}:
+        st.sidebar.subheader("SQL Connection Details")
 
-# Download button
-schema_json = json.dumps(st.session_state.schema_data, indent=2)
-st.sidebar.download_button(
-    label="📥 Download JSON",
-    data=schema_json,
-    file_name=f"{schema_name}.json",
-    mime="application/json",
-    use_container_width=True
-)
+        host = st.sidebar.text_input("Host", value="localhost")
+        port_default = 5432 if selected_db_type != DBType.MYSQL else 3306
+        port = st.sidebar.number_input("Port", value=port_default, step=1)
+        database = st.sidebar.text_input("Database name")
+        user = st.sidebar.text_input("User")
+        password = st.sidebar.text_input("Password", type="password")
 
-# Delete from S3
-st.sidebar.markdown("---")
-with st.sidebar.expander("🗑️ Delete from S3"):
+        selection_kwargs.update(
+            {
+                "host": host,
+                "port": port,
+                "database": database,
+                "user": user,
+                "password": password,
+            }
+        )
+
+    # File-based configuration
+    elif selected_db_type == DBType.FILES:
+        st.sidebar.subheader("S3 paths (no listing)")
+
+        s3_paths = st.sidebar.text_area(
+            "Enter S3 paths (one per line), e.g.\n"
+            "s3://excel-bucket-fortest/rossmann/rossmann_2013.xlsx\n"
+            "s3://excel-bucket-fortest/rossmann/rossmann_2014.csv"
+        )
+
+        file_items: list[FileItem] = []
+
+        for line in s3_paths.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            lower = line.lower()
+            if lower.endswith(".csv"):
+                file_items.append(
+                    FileItem(
+                        s3_uri=line,
+                        type=FileType.CSV,
+                    )
+                )
+            elif lower.endswith((".xlsx", ".xls")):
+                sheet_input_key = f"sheet_{line}"
+                sheet_name = st.sidebar.text_input(
+                    f"Sheet name for {line} (optional, default first sheet)",
+                    key=sheet_input_key,
+                )
+                file_items.append(
+                    FileItem(
+                        s3_uri=line,
+                        type=FileType.EXCEL,
+                        sheet_name=sheet_name or None,
+                    )
+                )
+            else:
+                st.sidebar.warning(f"Unsupported file type: {line}")
+
+        selection_kwargs["files"] = file_items if file_items else None
+
+
+    # --- Connect button ---
+    if st.sidebar.button("Connect"):
+        try:
+            selection = DBSelection(**selection_kwargs)
+            connector = create_connector(selection)
+            st.session_state["connector"] = connector
+            st.success("✅ Connected successfully!")
+            st.write("Available tables:", ", ".join(connector.list_tables()))
+        except Exception as e:
+            st.error(f"❌ Connection failed: {e}")
+    
+    # --- Schema Selection for AI Query ---
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🤖 AI Query Schema")
+    
     try:
-        from src.s3_service import delete_user_schema, list_user_schema
+        from src.s3_service import list_user_schema
         
         username = st.session_state.username or "raedmokdad"
-        success, s3_schemas = list_user_schema(username)
         
-        if success and s3_schemas:
-            schema_to_delete = st.selectbox(
-                "Select schema to delete:",
-                options=s3_schemas,
-                key="delete_schema_selector"
-            )
-            
-            if st.button("🗑️ Delete Selected", type="secondary", use_container_width=True):
-                if st.checkbox("Confirm deletion", key="confirm_delete"):
-                    del_success, del_message = delete_user_schema(username, schema_to_delete)
-                    if del_success:
-                        st.success(del_message)
-                        st.rerun()
-                    else:
-                        st.error(del_message)
-        else:
-            st.info("No schemas to delete")
+        col_db_s3_a, col_db_s3_b = st.sidebar.columns([3, 1])
+        
+        with col_db_s3_b:
+            if st.button("🔄", help="Refresh schemas", key="refresh_db_schemas"):
+                st.rerun()
+        
+        with col_db_s3_a:
+            with st.spinner("Loading..."):
+                success, db_schemas = list_user_schema(username)
+                
+                if success and db_schemas:
+                    selected_db_schema = st.selectbox(
+                        "Schema for AI:",
+                        options=db_schemas,
+                        index=db_schemas.index(st.session_state.get('db_query_schema', db_schemas[0])) 
+                            if st.session_state.get('db_query_schema') in db_schemas else 0,
+                        help="Select schema for natural language queries",
+                        key="db_schema_selector"
+                    )
+                    
+                    # Automatically set the selected schema
+                    st.session_state['db_query_schema'] = selected_db_schema
+                    st.sidebar.caption(f"✅ Using: {selected_db_schema}")
+                else:
+                    st.sidebar.info("No schemas found on S3")
     except Exception as e:
-        st.warning("S3 not available")
-
-
-# --- Sidebar: Data source selection ---
-st.sidebar.header("1. Data Source")
-
-db_type_label_to_enum = {
-    "PostgreSQL": DBType.POSTGRES,
-    "MySQL": DBType.MYSQL,
-    "Amazon Redshift": DBType.REDSHIFT,
-    "CSV / Excel Files": DBType.FILES,
-}
-
-db_choice = st.sidebar.selectbox(
-    "Select data source type",
-    list(db_type_label_to_enum.keys()),
-)
-
-selected_db_type = db_type_label_to_enum[db_choice]
-
-selection_kwargs = {"db_type": selected_db_type}
-
-# SQL DB configuration
-if selected_db_type in {DBType.POSTGRES, DBType.MYSQL, DBType.REDSHIFT}:
-    st.sidebar.subheader("SQL Connection Details")
-
-    host = st.sidebar.text_input("Host", value="localhost")
-    port_default = 5432 if selected_db_type != DBType.MYSQL else 3306
-    port = st.sidebar.number_input("Port", value=port_default, step=1)
-    database = st.sidebar.text_input("Database name")
-    user = st.sidebar.text_input("User")
-    password = st.sidebar.text_input("Password", type="password")
-
-    selection_kwargs.update(
-        {
-            "host": host,
-            "port": port,
-            "database": database,
-            "user": user,
-            "password": password,
-        }
-    )
-
-# File-based configuration
-elif selected_db_type == DBType.FILES:
-    st.sidebar.subheader("S3 paths (no listing)")
-
-    s3_paths = st.sidebar.text_area(
-        "Enter S3 paths (one per line), e.g.\n"
-        "s3://excel-bucket-fortest/rossmann/rossmann_2013.xlsx\n"
-        "s3://excel-bucket-fortest/rossmann/rossmann_2014.csv"
-    )
-
-    file_items: list[FileItem] = []
-
-    for line in s3_paths.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-
-        lower = line.lower()
-        if lower.endswith(".csv"):
-            file_items.append(
-                FileItem(
-                    s3_uri=line,
-                    type=FileType.CSV,
-                )
-            )
-        elif lower.endswith((".xlsx", ".xls")):
-            sheet_input_key = f"sheet_{line}"
-            sheet_name = st.sidebar.text_input(
-                f"Sheet name for {line} (optional, default first sheet)",
-                key=sheet_input_key,
-            )
-            file_items.append(
-                FileItem(
-                    s3_uri=line,
-                    type=FileType.EXCEL,
-                    sheet_name=sheet_name or None,
-                )
-            )
-        else:
-            st.sidebar.warning(f"Unsupported file type: {line}")
-
-    selection_kwargs["files"] = file_items if file_items else None
-
-
-# --- Connect button ---
-if st.sidebar.button("Connect"):
-    try:
-        selection = DBSelection(**selection_kwargs)
-        connector = create_connector(selection)
-        st.session_state["connector"] = connector
-        st.success("✅ Connected successfully!")
-        st.write("Available tables:", ", ".join(connector.list_tables()))
-    except Exception as e:
-        st.error(f"❌ Connection failed: {e}")
-
-connector = get_connector()                
+        st.sidebar.warning(f"Schema load error: {str(e)}")
 
 # ============================================================================
-# MAIN CONTENT TABS
+# MAIN CONTENT AREA
 # ============================================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "📊 Tables", 
-    "🔗 Relationships", 
-    "📈 Metrics", 
-    "💡 Examples", 
-    "📖 Glossary",
-    "🧪 Test SQL",
-    "🗂️ Schema Explorer", 
-    "💻 SQL Playground"
-])
+if app_mode == "📝 Schema Builder":
+    # ============================================================================
+    # SCHEMA BUILDER: MAIN CONTENT TABS
+    # ============================================================================
+
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Tables", 
+        "🔗 Relationships", 
+        "📈 Metrics", 
+        "💡 Examples", 
+        "📖 Glossary",
+        "🧪 Test SQL"
+    ])
 
 # ============================================================================
-# TAB 1: TABLES
-# ============================================================================
-with tab1:
-    st.header("📊 Table Definitions")
+    # TAB 1: TABLES
+    # ============================================================================
+    with tab1:
+        st.header("📊 Table Definitions")
     
-    col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns([2, 1])
     
-    with col2:
-        st.subheader("Add New Table")
-        table_type = st.radio("Table Type", ["fact", "dimension"])
+        with col2:
+            st.subheader("Add New Table")
+            table_type = st.radio("Table Type", ["fact", "dimension"])
         
-        if st.button("➕ Add Table", use_container_width=True):
-            new_table = create_default_table(table_type)
-            st.session_state.schema_data["schema"]["tables"].append(new_table)
-            st.rerun()
+            if st.button("➕ Add Table", use_container_width=True):
+                new_table = create_default_table(table_type)
+                st.session_state.schema_data["schema"]["tables"].append(new_table)
+                st.rerun()
     
-    with col1:
-        st.subheader("Existing Tables")
+        with col1:
+            st.subheader("Existing Tables")
         
-        tables = st.session_state.schema_data["schema"]["tables"]
+            tables = st.session_state.schema_data["schema"]["tables"]
         
-        if not tables:
-            st.info("No tables defined yet. Add a table to get started!")
-        else:
-            for idx, table in enumerate(tables):
-                with st.expander(f"**{table['name']}** ({table['role']})", expanded=False):
-                    # Basic info
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        table['name'] = st.text_input(
-                            "Table Name", 
-                            value=table['name'], 
-                            key=f"name_{idx}"
-                        )
-                        table['role'] = st.selectbox(
-                            "Role",
-                            options=["fact", "dimension"],
-                            index=0 if table['role'] == "fact" else 1,
-                            key=f"role_{idx}"
-                        )
-                    with col_b:
-                        table['grain'] = st.text_input(
-                            "Grain", 
-                            value=table['grain'], 
-                            key=f"grain_{idx}"
-                        )
-                        table['primary_key'] = st.text_input(
-                            "Primary Key", 
-                            value=table.get('primary_key', ''), 
-                            key=f"pk_{idx}"
-                        )
-                    
-                    # Columns
-                    st.markdown("**Columns:**")
-                    
-                    # Add new column
-                    col_new_a, col_new_b, col_new_c = st.columns([2, 3, 1])
-                    with col_new_a:
-                        new_col_name = st.text_input(
-                            "Column name", 
-                            key=f"new_col_name_{idx}",
-                            placeholder="column_name"
-                        )
-                    with col_new_b:
-                        new_col_desc = st.text_input(
-                            "Description", 
-                            key=f"new_col_desc_{idx}",
-                            placeholder="VARCHAR - Description"
-                        )
-                    with col_new_c:
-                        if st.button("➕", key=f"add_col_{idx}"):
-                            if new_col_name and new_col_desc:
-                                if 'columns' not in table:
-                                    table['columns'] = {}
-                                table['columns'][new_col_name] = new_col_desc
-                                st.rerun()
-                    
-                    # Display existing columns
-                    if 'columns' in table and table['columns']:
-                        cols_to_delete = []
-                        for col_name, col_desc in table['columns'].items():
-                            col_x, col_y, col_z = st.columns([2, 6, 1])
-                            with col_x:
-                                st.text(col_name)
-                            with col_y:
-                                st.text(col_desc)
-                            with col_z:
-                                if st.button("🗑️", key=f"del_col_{idx}_{col_name}"):
-                                    cols_to_delete.append(col_name)
-                        
-                        for col_name in cols_to_delete:
-                            del table['columns'][col_name]
-                            st.rerun()
-                    
-                    # Foreign keys (only for fact tables)
-                    if table['role'] == 'fact':
-                        st.markdown("**Foreign Keys:**")
-                        
-                        # Add new FK
-                        col_fk_a, col_fk_b, col_fk_c = st.columns([2, 3, 1])
-                        with col_fk_a:
-                            new_fk_col = st.text_input(
-                                "FK Column", 
-                                key=f"new_fk_col_{idx}",
-                                placeholder="date_key"
+            if not tables:
+                st.info("No tables defined yet. Add a table to get started!")
+            else:
+                for idx, table in enumerate(tables):
+                    with st.expander(f"**{table['name']}** ({table['role']})", expanded=False):
+                        # Basic info
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            table['name'] = st.text_input(
+                                "Table Name", 
+                                value=table['name'], 
+                                key=f"name_{idx}"
                             )
-                        with col_fk_b:
-                            new_fk_ref = st.text_input(
-                                "References", 
-                                key=f"new_fk_ref_{idx}",
-                                placeholder="dim_date.date_key"
+                            table['role'] = st.selectbox(
+                                "Role",
+                                options=["fact", "dimension"],
+                                index=0 if table['role'] == "fact" else 1,
+                                key=f"role_{idx}"
                             )
-                        with col_fk_c:
-                            if st.button("➕", key=f"add_fk_{idx}"):
-                                if new_fk_col and new_fk_ref:
-                                    if 'foreign_keys' not in table:
-                                        table['foreign_keys'] = {}
-                                    table['foreign_keys'][new_fk_col] = new_fk_ref
+                        with col_b:
+                            table['grain'] = st.text_input(
+                                "Grain", 
+                                value=table['grain'], 
+                                key=f"grain_{idx}"
+                            )
+                            table['primary_key'] = st.text_input(
+                                "Primary Key", 
+                                value=table.get('primary_key', ''), 
+                                key=f"pk_{idx}"
+                            )
+                    
+                        # Columns
+                        st.markdown("**Columns:**")
+                    
+                        # Add new column
+                        col_new_a, col_new_b, col_new_c = st.columns([2, 3, 1])
+                        with col_new_a:
+                            new_col_name = st.text_input(
+                                "Column name", 
+                                key=f"new_col_name_{idx}",
+                                placeholder="column_name"
+                            )
+                        with col_new_b:
+                            new_col_desc = st.text_input(
+                                "Description", 
+                                key=f"new_col_desc_{idx}",
+                                placeholder="VARCHAR - Description"
+                            )
+                        with col_new_c:
+                            if st.button("➕", key=f"add_col_{idx}"):
+                                if new_col_name and new_col_desc:
+                                    if 'columns' not in table:
+                                        table['columns'] = {}
+                                    table['columns'][new_col_name] = new_col_desc
                                     st.rerun()
-                        
-                        # Display existing FKs
-                        if 'foreign_keys' in table and table['foreign_keys']:
-                            fks_to_delete = []
-                            for fk_col, fk_ref in table['foreign_keys'].items():
+                    
+                        # Display existing columns
+                        if 'columns' in table and table['columns']:
+                            cols_to_delete = []
+                            for col_name, col_desc in table['columns'].items():
                                 col_x, col_y, col_z = st.columns([2, 6, 1])
                                 with col_x:
-                                    st.text(fk_col)
+                                    st.text(col_name)
                                 with col_y:
-                                    st.text(f"→ {fk_ref}")
+                                    st.text(col_desc)
                                 with col_z:
-                                    if st.button("🗑️", key=f"del_fk_{idx}_{fk_col}"):
-                                        fks_to_delete.append(fk_col)
-                            
-                            for fk_col in fks_to_delete:
-                                del table['foreign_keys'][fk_col]
+                                    if st.button("🗑️", key=f"del_col_{idx}_{col_name}"):
+                                        cols_to_delete.append(col_name)
+                        
+                            for col_name in cols_to_delete:
+                                del table['columns'][col_name]
                                 st.rerun()
                     
-                    # Delete table button
-                    if st.button(f"🗑️ Delete Table", key=f"del_table_{idx}", type="secondary"):
-                        st.session_state.schema_data["schema"]["tables"].pop(idx)
-                        st.rerun()
-
-# ============================================================================
-# TAB 2: RELATIONSHIPS
-# ============================================================================
-with tab2:
-    st.header("🔗 Table Relationships")
-    st.info("Relationships are auto-generated from foreign keys, but you can add custom notes here")
-    
-    # Display auto-detected relationships
-    st.subheader("Auto-Detected Relationships")
-    relationships = []
-    for table in st.session_state.schema_data["schema"]["tables"]:
-        if table['role'] == 'fact' and 'foreign_keys' in table:
-            for fk_col, fk_ref in table['foreign_keys'].items():
-                relationships.append({
-                    "from": f"{table['name']}.{fk_col}",
-                    "to": fk_ref,
-                    "type": "many-to-one"
-                })
-    
-    if relationships:
-        for rel in relationships:
-            st.markdown(f"- `{rel['from']}` → `{rel['to']}` ({rel['type']})")
-    else:
-        st.warning("No relationships found. Add foreign keys in the Tables tab.")
-
-# ============================================================================
-# TAB 3: METRICS
-# ============================================================================
-with tab3:
-    st.header("📈 Predefined Metrics")
-    st.info("Define common calculations for your schema")
-    
-    # Add new metric
-    with st.expander("➕ Add New Metric", expanded=False):
-        metric_key = st.text_input("Metric Key", placeholder="total_revenue")
-        metric_formula = st.text_input("Formula", placeholder="SUM(fact_sales.sales_amount)")
-        metric_desc = st.text_input("Description", placeholder="Total revenue across all sales")
-        metric_tables = st.text_input("Required Tables (comma-separated)", placeholder="fact_sales, dim_date")
-        metric_keywords = st.text_input("Keywords (comma-separated)", placeholder="umsatz, revenue, total")
-        
-        if st.button("Add Metric"):
-            if metric_key and metric_formula:
-                if 'metrics' not in st.session_state.schema_data["schema"]:
-                    st.session_state.schema_data["schema"]["metrics"] = {}
-                
-                st.session_state.schema_data["schema"]["metrics"][metric_key] = {
-                    "formula": metric_formula,
-                    "description": metric_desc,
-                    "required_tables": [t.strip() for t in metric_tables.split(",") if t.strip()],
-                    "keywords": [k.strip() for k in metric_keywords.split(",") if k.strip()]
-                }
-                st.success(f"Metric '{metric_key}' added!")
-                st.rerun()
-    
-    # Display existing metrics
-    metrics = st.session_state.schema_data["schema"].get("metrics", {})
-    if metrics:
-        metrics_to_delete = []
-        for key, value in metrics.items():
-            with st.expander(f"**{key}**"):
-                st.code(value.get('formula', ''), language='sql')
-                st.markdown(f"**Description:** {value.get('description', '')}")
-                st.markdown(f"**Tables:** {', '.join(value.get('required_tables', []))}")
-                st.markdown(f"**Keywords:** {', '.join(value.get('keywords', []))}")
-                
-                if st.button(f"🗑️ Delete", key=f"del_metric_{key}"):
-                    metrics_to_delete.append(key)
-        
-        for key in metrics_to_delete:
-            del st.session_state.schema_data["schema"]["metrics"][key]
-            st.rerun()
-
-# ============================================================================
-# TAB 4: EXAMPLES
-# ============================================================================
-with tab4:
-    st.header("💡 SQL Examples")
-    st.info("Provide example queries to help the LLM understand your schema")
-    
-    # Add new example
-    with st.expander("➕ Add New Example", expanded=False):
-        example_desc = st.text_input("Description", placeholder="Monthly sales by region")
-        example_sql = st.text_area("SQL Pattern", placeholder="SELECT ... FROM ... WHERE ...", height=100)
-        
-        if st.button("Add Example"):
-            if example_desc and example_sql:
-                if 'examples' not in st.session_state.schema_data["schema"]:
-                    st.session_state.schema_data["schema"]["examples"] = []
-                
-                st.session_state.schema_data["schema"]["examples"].append({
-                    "description": example_desc,
-                    "pattern": example_sql
-                })
-                st.success("Example added!")
-                st.rerun()
-    
-    # Display existing examples
-    examples = st.session_state.schema_data["schema"].get("examples", [])
-    if examples:
-        examples_to_delete = []
-        for idx, example in enumerate(examples):
-            with st.expander(f"**{example['description']}**"):
-                st.code(example['pattern'], language='sql')
-                
-                if st.button(f"🗑️ Delete", key=f"del_example_{idx}"):
-                    examples_to_delete.append(idx)
-        
-        for idx in reversed(examples_to_delete):
-            st.session_state.schema_data["schema"]["examples"].pop(idx)
-            st.rerun()
-
-# ============================================================================
-# TAB 5: GLOSSARY
-# ============================================================================
-with tab5:
-    st.header("📖 Glossary")
-    st.info("Define business terms and their meanings")
-    
-    # Add new term
-    col_a, col_b, col_c = st.columns([2, 5, 1])
-    with col_a:
-        new_term = st.text_input("Term", placeholder="net_sales")
-    with col_b:
-        new_definition = st.text_input("Definition", placeholder="Sales after discounts and returns")
-    with col_c:
-        if st.button("➕ Add"):
-            if new_term and new_definition:
-                if 'glossary' not in st.session_state.schema_data["schema"]:
-                    st.session_state.schema_data["schema"]["glossary"] = {}
-                
-                st.session_state.schema_data["schema"]["glossary"][new_term] = new_definition
-                st.rerun()
-    
-    # Display existing terms
-    glossary = st.session_state.schema_data["schema"].get("glossary", {})
-    if glossary:
-        terms_to_delete = []
-        for term, definition in glossary.items():
-            col_x, col_y, col_z = st.columns([2, 6, 1])
-            with col_x:
-                st.markdown(f"**{term}**")
-            with col_y:
-                st.text(definition)
-            with col_z:
-                if st.button("🗑️", key=f"del_term_{term}"):
-                    terms_to_delete.append(term)
-        
-        for term in terms_to_delete:
-            del st.session_state.schema_data["schema"]["glossary"][term]
-            st.rerun()
-
-# ============================================================================
-# TAB 6: TEST SQL
-# ============================================================================
-with tab6:
-    st.header("🧪 Test Your Schema with SQL Generation")
-    st.info("Upload schema to S3, select it, and ask questions to generate SQL")
-    
-    if not st.session_state.schema_data["schema"]["tables"]:
-        st.warning("⚠️ No tables defined. Add tables first in the Tables tab.")
-    else:
-        # Step 1: Upload Schema to S3
-        st.markdown("### 1️⃣ Upload Schema to S3")
-        
-        col_upload_a, col_upload_b = st.columns([2, 1])
-        
-        with col_upload_a:
-            upload_schema_name = st.text_input(
-                "Schema Name for Upload",
-                value=schema_name,
-                key="upload_schema_name"
-            )
-            st.caption("This will be saved on S3 for testing")
-        
-        with col_upload_b:
-            if st.button("☁️ Upload to S3 for Testing", use_container_width=True, type="primary"):
-                username = st.session_state.username or "raedmokdad"
-                
-                with st.spinner("Uploading to S3..."):
-                    success = upload_schema_to_s3(
-                        st.session_state.schema_data, 
-                        upload_schema_name, 
-                        username
-                    )
-                    
-                    if success:
-                        st.session_state['uploaded_schema'] = upload_schema_name
-                        st.session_state['uploaded_username'] = username
-        
-        st.markdown("---")
-        
-        # Step 2: Select Schema from S3 (or use current)
-        st.markdown("### 2️⃣ Select Schema for Testing")
-        
-        tab_current, tab_s3 = st.tabs(["📄 Current Schema", "☁️ S3 Schemas"])
-        
-        with tab_current:
-            st.info(f"**Current Schema:** {schema_name}")
-            st.caption("This is the schema you're currently editing")
-            
-            if st.button("✅ Use Current Schema", use_container_width=True, type="primary"):
-                # Save current schema to S3 first
-                username = st.session_state.username or "raedmokdad"
-                
-                with st.spinner("Uploading current schema to S3..."):
-                    success = upload_schema_to_s3(
-                        st.session_state.schema_data, 
-                        schema_name, 
-                        username
-                    )
-                    
-                    if success:
-                        st.session_state['selected_test_schema'] = schema_name
-                        st.success(f"✅ Using: **{schema_name}**")
-        
-        with tab_s3:
-            try:
-                from src.s3_service import list_user_schema
-                
-                username = st.session_state.username or "raedmokdad"
-                
-                # Debug info
-                st.caption(f"🔍 Loading schemas for user: **{username}**")
-                
-                col_list_a, col_list_b = st.columns([3, 1])
-                
-                with col_list_b:
-                    if st.button("🔄 Refresh", use_container_width=True, key="refresh_test_schemas"):
-                        st.rerun()
-                
-                with col_list_a:
-                    with st.spinner("Loading from S3..."):
-                        success, schemas = list_user_schema(username)
+                        # Foreign keys (only for fact tables)
+                        if table['role'] == 'fact':
+                            st.markdown("**Foreign Keys:**")
                         
-                        # More debug info
-                        st.caption(f"📊 Result: Success={success}, Found={len(schemas) if schemas else 0} schemas")
+                            # Add new FK
+                            col_fk_a, col_fk_b, col_fk_c = st.columns([2, 3, 1])
+                            with col_fk_a:
+                                new_fk_col = st.text_input(
+                                    "FK Column", 
+                                    key=f"new_fk_col_{idx}",
+                                    placeholder="date_key"
+                                )
+                            with col_fk_b:
+                                new_fk_ref = st.text_input(
+                                    "References", 
+                                    key=f"new_fk_ref_{idx}",
+                                    placeholder="dim_date.date_key"
+                                )
+                            with col_fk_c:
+                                if st.button("➕", key=f"add_fk_{idx}"):
+                                    if new_fk_col and new_fk_ref:
+                                        if 'foreign_keys' not in table:
+                                            table['foreign_keys'] = {}
+                                        table['foreign_keys'][new_fk_col] = new_fk_ref
+                                        st.rerun()
                         
-                        if success and schemas:
-                            selected_schema_name = st.selectbox(
-                                "📋 Your Schemas on S3:",
-                                options=schemas,
-                                index=schemas.index(st.session_state.get('selected_test_schema', schemas[0])) 
-                                    if st.session_state.get('selected_test_schema') in schemas else 0,
-                                help="Select a schema to test",
-                                key="s3_test_schema_select"
-                            )
+                            # Display existing FKs
+                            if 'foreign_keys' in table and table['foreign_keys']:
+                                fks_to_delete = []
+                                for fk_col, fk_ref in table['foreign_keys'].items():
+                                    col_x, col_y, col_z = st.columns([2, 6, 1])
+                                    with col_x:
+                                        st.text(fk_col)
+                                    with col_y:
+                                        st.text(f"→ {fk_ref}")
+                                    with col_z:
+                                        if st.button("🗑️", key=f"del_fk_{idx}_{fk_col}"):
+                                            fks_to_delete.append(fk_col)
                             
-                            if st.button("✅ Use Selected", use_container_width=True, key="use_selected_test"):
-                                st.session_state['selected_test_schema'] = selected_schema_name
-                                st.success(f"✅ Using: **{selected_schema_name}**")
-                            
-                        elif success:
-                            st.info(f"No schemas found on S3 for user '{username}'. Upload a schema first!")
-                        else:
-                            st.error("Error loading schemas from S3")
+                                for fk_col in fks_to_delete:
+                                    del table['foreign_keys'][fk_col]
+                                    st.rerun()
+                    
+                        # Delete table button
+                        if st.button(f"🗑️ Delete Table", key=f"del_table_{idx}", type="secondary"):
+                            st.session_state.schema_data["schema"]["tables"].pop(idx)
+                            st.rerun()
+
+    # ============================================================================
+    # TAB 2: RELATIONSHIPS
+    # ============================================================================
+    with tab2:
+        st.header("🔗 Table Relationships")
+        st.info("Relationships are auto-generated from foreign keys, but you can add custom notes here")
+    
+        # Display auto-detected relationships
+        st.subheader("Auto-Detected Relationships")
+        relationships = []
+        for table in st.session_state.schema_data["schema"]["tables"]:
+            if table['role'] == 'fact' and 'foreign_keys' in table:
+                for fk_col, fk_ref in table['foreign_keys'].items():
+                    relationships.append({
+                        "from": f"{table['name']}.{fk_col}",
+                        "to": fk_ref,
+                        "type": "many-to-one"
+                    })
+    
+        if relationships:
+            for rel in relationships:
+                st.markdown(f"- `{rel['from']}` → `{rel['to']}` ({rel['type']})")
+        else:
+            st.warning("No relationships found. Add foreign keys in the Tables tab.")
+
+    # ============================================================================
+    # TAB 3: METRICS
+    # ============================================================================
+    with tab3:
+        st.header("📈 Predefined Metrics")
+        st.info("Define common calculations for your schema")
+    
+        # Add new metric
+        with st.expander("➕ Add New Metric", expanded=False):
+            metric_key = st.text_input("Metric Key", placeholder="total_revenue")
+            metric_formula = st.text_input("Formula", placeholder="SUM(fact_sales.sales_amount)")
+            metric_desc = st.text_input("Description", placeholder="Total revenue across all sales")
+            metric_tables = st.text_input("Required Tables (comma-separated)", placeholder="fact_sales, dim_date")
+            metric_keywords = st.text_input("Keywords (comma-separated)", placeholder="umsatz, revenue, total")
+        
+            if st.button("Add Metric"):
+                if metric_key and metric_formula:
+                    if 'metrics' not in st.session_state.schema_data["schema"]:
+                        st.session_state.schema_data["schema"]["metrics"] = {}
+                
+                    st.session_state.schema_data["schema"]["metrics"][metric_key] = {
+                        "formula": metric_formula,
+                        "description": metric_desc,
+                        "required_tables": [t.strip() for t in metric_tables.split(",") if t.strip()],
+                        "keywords": [k.strip() for k in metric_keywords.split(",") if k.strip()]
+                    }
+                    st.success(f"Metric '{metric_key}' added!")
+                    st.rerun()
+    
+        # Display existing metrics
+        metrics = st.session_state.schema_data["schema"].get("metrics", {})
+        if metrics:
+            metrics_to_delete = []
+            for key, value in metrics.items():
+                with st.expander(f"**{key}**"):
+                    st.code(value.get('formula', ''), language='sql')
+                    st.markdown(f"**Description:** {value.get('description', '')}")
+                    st.markdown(f"**Tables:** {', '.join(value.get('required_tables', []))}")
+                    st.markdown(f"**Keywords:** {', '.join(value.get('keywords', []))}")
+                
+                    if st.button(f"🗑️ Delete", key=f"del_metric_{key}"):
+                        metrics_to_delete.append(key)
+        
+            for key in metrics_to_delete:
+                del st.session_state.schema_data["schema"]["metrics"][key]
+                st.rerun()
+
+    # ============================================================================
+    # TAB 4: EXAMPLES
+    # ============================================================================
+    with tab4:
+        st.header("💡 SQL Examples")
+        st.info("Provide example queries to help the LLM understand your schema")
+    
+        # Add new example
+        with st.expander("➕ Add New Example", expanded=False):
+            example_desc = st.text_input("Description", placeholder="Monthly sales by region")
+            example_sql = st.text_area("SQL Pattern", placeholder="SELECT ... FROM ... WHERE ...", height=100)
+        
+            if st.button("Add Example"):
+                if example_desc and example_sql:
+                    if 'examples' not in st.session_state.schema_data["schema"]:
+                        st.session_state.schema_data["schema"]["examples"] = []
+                
+                    st.session_state.schema_data["schema"]["examples"].append({
+                        "description": example_desc,
+                        "pattern": example_sql
+                    })
+                    st.success("Example added!")
+                    st.rerun()
+    
+        # Display existing examples
+        examples = st.session_state.schema_data["schema"].get("examples", [])
+        if examples:
+            examples_to_delete = []
+            for idx, example in enumerate(examples):
+                with st.expander(f"**{example['description']}**"):
+                    st.code(example['pattern'], language='sql')
+                
+                    if st.button(f"🗑️ Delete", key=f"del_example_{idx}"):
+                        examples_to_delete.append(idx)
+        
+            for idx in reversed(examples_to_delete):
+                st.session_state.schema_data["schema"]["examples"].pop(idx)
+                st.rerun()
+
+    # ============================================================================
+    # TAB 5: GLOSSARY
+    # ============================================================================
+    with tab5:
+        st.header("📖 Glossary")
+        st.info("Define business terms and their meanings")
+    
+        # Add new term
+        col_a, col_b, col_c = st.columns([2, 5, 1])
+        with col_a:
+            new_term = st.text_input("Term", placeholder="net_sales")
+        with col_b:
+            new_definition = st.text_input("Definition", placeholder="Sales after discounts and returns")
+        with col_c:
+            if st.button("➕ Add"):
+                if new_term and new_definition:
+                    if 'glossary' not in st.session_state.schema_data["schema"]:
+                        st.session_state.schema_data["schema"]["glossary"] = {}
+                
+                    st.session_state.schema_data["schema"]["glossary"][new_term] = new_definition
+                    st.rerun()
+    
+        # Display existing terms
+        glossary = st.session_state.schema_data["schema"].get("glossary", {})
+        if glossary:
+            terms_to_delete = []
+            for term, definition in glossary.items():
+                col_x, col_y, col_z = st.columns([2, 6, 1])
+                with col_x:
+                    st.markdown(f"**{term}**")
+                with col_y:
+                    st.text(definition)
+                with col_z:
+                    if st.button("🗑️", key=f"del_term_{term}"):
+                        terms_to_delete.append(term)
+        
+            for term in terms_to_delete:
+                del st.session_state.schema_data["schema"]["glossary"][term]
+                st.rerun()
+
+    # ============================================================================
+    # TAB 6: TEST SQL
+    # ============================================================================
+    with tab6:
+        st.header("🧪 Test Your Schema with SQL Generation")
+        st.info("Select a schema from S3 and ask questions to generate SQL")
+    
+        # Step 1: Upload Current Schema to S3 (optional, if tables exist)
+        if st.session_state.schema_data["schema"]["tables"]:
+            st.markdown("### 1️⃣ Upload Current Schema to S3 (Optional)")
+        
+            col_upload_a, col_upload_b = st.columns([2, 1])
+        
+            with col_upload_a:
+                upload_schema_name = st.text_input(
+                    "Schema Name for Upload",
+                    value=schema_name,
+                    key="upload_schema_name"
+                )
+                st.caption("Upload your current schema to S3 for testing")
+        
+            with col_upload_b:
+                if st.button("☁️ Upload to S3", use_container_width=True, type="secondary"):
+                    username = st.session_state.username or "raedmokdad"
+                
+                    with st.spinner("Uploading to S3..."):
+                        success = upload_schema_to_s3(
+                            st.session_state.schema_data, 
+                            upload_schema_name, 
+                            username
+                        )
+                    
+                        if success:
+                            st.session_state['uploaded_schema'] = upload_schema_name
+                            st.session_state['uploaded_username'] = username
+                            st.success(f"✅ Schema '{upload_schema_name}' uploaded!")
             
-            except Exception as e:
-                st.error(f"Error accessing S3: {str(e)}")
-                st.info("💡 Make sure AWS credentials are configured in .env file")
+            st.markdown("---")
+        
+        # Step 2: Select Schema from S3
+        try:
+            from src.s3_service import list_user_schema
+            
+            username = st.session_state.username or "raedmokdad"
+            
+            col_list_a, col_list_b = st.columns([3, 1])
+            
+            with col_list_b:
+                if st.button("🔄 Refresh", use_container_width=True, key="refresh_test_schemas"):
+                    st.rerun()
+            
+            with col_list_a:
+                with st.spinner("Loading from S3..."):
+                    success, schemas = list_user_schema(username)
+                    
+                    if success and schemas:
+                        selected_schema_name = st.selectbox(
+                            "📋 Your Schemas on S3:",
+                            options=schemas,
+                            index=schemas.index(st.session_state.get('selected_test_schema', schemas[0])) 
+                                if st.session_state.get('selected_test_schema') in schemas else 0,
+                            help="Select a schema to test",
+                            key="s3_test_schema_select"
+                        )
+                        
+                        # Automatically set the selected schema (no button needed)
+                        st.session_state['selected_test_schema'] = selected_schema_name
+                        st.success(f"✅ Using Schema: **{selected_schema_name}**")
+                    
+                    elif success:
+                        st.info(f"No schemas found on S3 for user '{username}'. Upload a schema first in the Tables tab!")
+                    else:
+                        st.error("Error loading schemas from S3")
+        
+        except Exception as e:
+            st.error(f"Error accessing S3: {str(e)}")
+            st.info("💡 Make sure AWS credentials are configured in .env file")
         
         st.markdown("---")
         
         # Step 3: Ask Questions
         if st.session_state.get('selected_test_schema'):
-            st.markdown("### 3️⃣ Ask Questions")
+            st.markdown("### 2️⃣ Ask Questions")
+            st.success(f"📋 Selected Schema: **{st.session_state['selected_test_schema']}**")
             
             # API Health Check
             col_health_a, col_health_b = st.columns([3, 1])
@@ -957,22 +1024,56 @@ with tab6:
                         value=2
                     )
             
-            # Example Questions
+            # Example Questions - Load from selected schema
             st.markdown("**💡 Quick Examples:**")
             
-            example_questions = [
-                "Wie viel Umsatz insgesamt?",
-                "Top 10 Produkte nach Umsatz",
-                "Umsatz pro Store in 2023",
-                "Durchschnittlicher Umsatz pro Tag"
-            ]
+            # Try to load examples from the selected schema
+            try:
+                from src.s3_service import get_user_schema
+                username = st.session_state.username or "raedmokdad"
+                selected_schema = st.session_state['selected_test_schema']
+                
+                success, schema_data = get_user_schema(username, selected_schema)
+                
+                if success and schema_data and 'schema' in schema_data:
+                    # Extract example descriptions from schema
+                    schema_examples = schema_data['schema'].get('examples', [])
+                    if schema_examples:
+                        example_questions = [ex.get('description', 'Example query') for ex in schema_examples[:4]]
+                    else:
+                        # Fallback to generic examples
+                        example_questions = [
+                            "Wie viel Umsatz insgesamt?",
+                            "Top 10 Produkte nach Umsatz",
+                            "Umsatz pro Store in 2023",
+                            "Durchschnittlicher Umsatz pro Tag"
+                        ]
+                else:
+                    # Fallback
+                    example_questions = [
+                        "Wie viel Umsatz insgesamt?",
+                        "Top 10 Produkte nach Umsatz",
+                        "Umsatz pro Store in 2023",
+                        "Durchschnittlicher Umsatz pro Tag"
+                    ]
+            except Exception as e:
+                # Fallback on error
+                example_questions = [
+                    "Wie viel Umsatz insgesamt?",
+                    "Top 10 Produkte nach Umsatz",
+                    "Umsatz pro Store in 2023",
+                    "Durchschnittlicher Umsatz pro Tag"
+                ]
             
-            col_ex1, col_ex2, col_ex3, col_ex4 = st.columns(4)
+            # Display example buttons (up to 4)
+            example_questions = example_questions[:4]  # Limit to 4
+            cols = st.columns(len(example_questions))
             
-            for idx, (col, question) in enumerate(zip([col_ex1, col_ex2, col_ex3, col_ex4], example_questions)):
+            for idx, (col, question) in enumerate(zip(cols, example_questions)):
                 with col:
                     if st.button(question, key=f"example_{idx}", use_container_width=True):
                         st.session_state['test_question'] = question
+                        st.rerun()
             
             # Question Input
             test_question = st.text_area(
@@ -1061,14 +1162,13 @@ with tab6:
                                 4. Wrong schema name: Verify in Step 2
                                 """)
                 else:
-                    st.warning("Please enter a question")
-        
+                    st.warning("⚠️ Please enter a question")
         else:
-            st.info("👆 Please upload and select a schema first")
+            st.info("👆 Please select a schema from S3 first using Step 1")
         
         st.markdown("---")
         
-        # Schema Validation
+        # Schema Validation (always visible)
         st.markdown("### 4️⃣ Schema Validation")
         
         col_val_a, col_val_b = st.columns(2)
@@ -1101,186 +1201,258 @@ with tab6:
             total_columns = sum(len(t.get('columns', {})) for t in tables)
             st.metric("Total Columns", total_columns)
 
+    # ============================================================================
+    # SCHEMA BUILDER: JSON PREVIEW
+    # ============================================================================
+    st.markdown("---")
+    st.subheader("📄 JSON Preview")
+    with st.expander("View Raw JSON", expanded=False):
+        st.json(st.session_state.schema_data)
 
+# ============================================================================
+# DATABASE QUERY MODUS: MAIN CONTENT
+# ============================================================================
+else:  # app_mode == "🔍 Database Query"
+    
+    connector = get_connector()
+    
+    if connector is None:
+        st.info("👆 Please configure and connect to a data source in the sidebar first.")
+    else:
+        # Database Query Tabs - nur noch 2 Tabs
+        tab_explorer, tab_playground = st.tabs([
+            "🗂️ Schema Explorer", 
+            "💻 SQL Playground"
+        ])
+        
+        # ============================================================================
+        # TAB: SCHEMA EXPLORER
+        # ============================================================================
+        with tab_explorer:
+            st.subheader("Schema Explorer")
 
-if connector is not None:
-     
-    with tab7:
-        st.subheader("Schema Explorer")
-
-        tables = connector.list_tables()
-        if not tables:
-            st.warning("No tables available.")
-        else:
-            table_name = st.selectbox("Select a table", tables)
-            schema = connector.get_table_schema(table_name)
-            st.write(f"Schema for **{table_name}**")
-            st.dataframe(schema)
-
-    with tab8:
-            
-            st.subheader("SQL Playground")
-
-            default_sql = ""
             tables = connector.list_tables()
-            if tables:
-                default_sql = f"SELECT * FROM {tables[0]} LIMIT 10;"
+            if not tables:
+                st.warning("No tables available.")
+            else:
+                table_name = st.selectbox("Select a table", tables)
+                schema = connector.get_table_schema(table_name)
+                st.write(f"Schema for **{table_name}**")
+                st.dataframe(schema)
 
-            user_sql = st.text_area(
-                "Enter SQL query",
-                value=default_sql,
-                height=160,
-                key="sql_input",
+        # ============================================================================
+        # TAB: SQL PLAYGROUND (mit Natural Language Integration)
+        # ============================================================================
+        with tab_playground:
+            st.subheader("💻 SQL Playground")
+            
+            # Input Mode Selector
+            input_mode = st.radio(
+                "Input Mode:",
+                ["📝 SQL", "🤖 Natural Language"],
+                horizontal=True,
+                key="playground_input_mode"
             )
-
-            run_clicked = st.button("Run query")
-
-            # --- 1) Run the query and store result in session_state ---
-            if run_clicked:
-                lowered = user_sql.strip().lower()
-                try:
-                    if lowered.startswith("select"):
-                        rows = connector.run_query(user_sql)
-                        df = pd.DataFrame(rows)
-                        st.session_state["last_df"] = df
-                        st.session_state["last_sql"] = user_sql
-                        st.session_state["last_msg"] = f"Returned {len(df)} rows"
-                    else:
-                        connector.execute(user_sql)
+            
+            tables = connector.list_tables()
+            default_sql = f"SELECT * FROM {tables[0]} LIMIT 10;" if tables else ""
+            
+            # ============================================
+            # SQL MODE
+            # ============================================
+            if input_mode == "📝 SQL":
+                user_sql = st.text_area(
+                    "Enter SQL query:",
+                    value=st.session_state.get("current_sql", default_sql),
+                    height=160,
+                    key="sql_input",
+                )
+                
+                run_clicked = st.button("▶️ Run Query", type="primary")
+                
+                if run_clicked:
+                    lowered = user_sql.strip().lower()
+                    try:
+                        if lowered.startswith("select"):
+                            rows = connector.run_query(user_sql)
+                            df = pd.DataFrame(rows)
+                            st.session_state["last_df"] = df
+                            st.session_state["last_sql"] = user_sql
+                            st.session_state["last_msg"] = f"✅ Returned {len(df)} rows"
+                        else:
+                            connector.execute(user_sql)
+                            st.session_state["last_df"] = None
+                            st.session_state["last_sql"] = user_sql
+                            st.session_state["last_msg"] = "✅ Statement executed successfully."
+                    except Exception as e:
                         st.session_state["last_df"] = None
                         st.session_state["last_sql"] = user_sql
-                        st.session_state["last_msg"] = "✅ Statement executed successfully."
-                except Exception as e:
-                    st.session_state["last_df"] = None
-                    st.session_state["last_sql"] = user_sql
-                    st.session_state["last_msg"] = f"❌ Error: {e}"
-
-            # --- 2) Always display last result + charts (independent of button) ---
+                        st.session_state["last_msg"] = f"❌ Error: {e}"
+            
+            # ============================================
+            # NATURAL LANGUAGE MODE
+            # ============================================
+            else:  # Natural Language Mode
+                selected_schema = st.session_state.get('db_query_schema')
+                
+                if not selected_schema:
+                    st.warning("⚠️ Please select a schema in the sidebar (🤖 AI Query Schema section) to use Natural Language mode")
+                else:
+                    st.success(f"📚 Using schema: **{selected_schema}**")
+                    
+                    user_question = st.text_area(
+                        "Ask your question in natural language:",
+                        placeholder="Example: What were the total sales by product category last month?",
+                        height=100,
+                        key="nl_question_input"
+                    )
+                    
+                    col_gen, col_info = st.columns([1, 3])
+                    with col_gen:
+                        generate_clicked = st.button("🚀 Generate SQL", type="primary", use_container_width=True)
+                    with col_info:
+                        st.caption("💡 Tip: You can ask questions in German or English")
+                    
+                    if generate_clicked and user_question:
+                        with st.spinner("🤖 Generating SQL from your question..."):
+                            try:
+                                api_url = "http://localhost:8000/generate-sql"
+                                username = st.session_state.get('username', 'raedmokdad')
+                                
+                                payload = {
+                                    "question": user_question,
+                                    "schema_name": selected_schema,
+                                    "username": username
+                                }
+                                
+                                response = requests.post(api_url, json=payload, timeout=30)
+                                
+                                if response.status_code == 200:
+                                    result = response.json()
+                                    
+                                    # Store results in session state
+                                    st.session_state["nl_confidence"] = result.get('confidence', 0)
+                                    st.session_state["nl_validation"] = result.get('validation_passed', True)
+                                    st.session_state["nl_processing_time"] = result.get('processing_time', 0)
+                                    st.session_state["generated_sql"] = result.get('sql_query', '')
+                                    st.session_state["nl_generated"] = True
+                                    st.rerun()
+                                
+                                else:
+                                    st.error(f"❌ API Error {response.status_code}: {response.text}")
+                            
+                            except requests.exceptions.Timeout:
+                                st.error("❌ Request timeout. Please check if the API is running.")
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
+                                st.info("💡 Make sure the API server is running: `uvicorn api_service:app --port 8000`")
+                    
+                    elif generate_clicked:
+                        st.warning("⚠️ Please enter a question first")
+                    
+                    # Display generated SQL and metrics (persistent)
+                    if st.session_state.get("nl_generated") and st.session_state.get("generated_sql"):
+                        st.markdown("---")
+                        
+                        # Display Metrics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            confidence = st.session_state.get('nl_confidence', 0)
+                            st.metric("Confidence", f"{confidence:.0%}")
+                        with col2:
+                            validation = st.session_state.get('nl_validation', True)
+                            st.metric("Validation", "✅ Passed" if validation else "❌ Failed")
+                        with col3:
+                            processing_time = st.session_state.get('nl_processing_time', 0)
+                            st.metric("Time", f"{processing_time:.2f}s")
+                        
+                        # Generated SQL
+                        generated_sql = st.session_state.get("generated_sql", "")
+                        st.markdown("### Generated SQL:")
+                        st.code(generated_sql, language='sql')
+                        
+                        # Run Query Button (same as SQL mode)
+                        run_nl_query = st.button("▶️ Run Query", type="primary", key="run_nl_query")
+                        
+                        if run_nl_query:
+                            try:
+                                lowered = generated_sql.strip().lower()
+                                if lowered.startswith("select"):
+                                    rows = connector.run_query(generated_sql)
+                                    df = pd.DataFrame(rows)
+                                    st.session_state["last_df"] = df
+                                    st.session_state["last_sql"] = generated_sql
+                                    st.session_state["last_msg"] = f"✅ Returned {len(df)} rows"
+                                else:
+                                    connector.execute(generated_sql)
+                                    st.session_state["last_df"] = None
+                                    st.session_state["last_sql"] = generated_sql
+                                    st.session_state["last_msg"] = "✅ Statement executed successfully."
+                            except Exception as e:
+                                st.session_state["last_df"] = None
+                                st.session_state["last_sql"] = generated_sql
+                                st.session_state["last_msg"] = f"❌ Error: {e}"
+            
+            # ============================================
+            # RESULTS DISPLAY (Both Modes)
+            # ============================================
+            st.markdown("---")
+            
+            # Display last message
             last_msg = st.session_state.get("last_msg")
             if last_msg:
-                st.write(last_msg)
-
+                if last_msg.startswith("✅"):
+                    st.success(last_msg)
+                elif last_msg.startswith("❌"):
+                    st.error(last_msg)
+                else:
+                    st.info(last_msg)
+            
+            # Display DataFrame if available
             df = st.session_state.get("last_df")
-
+            
             if isinstance(df, pd.DataFrame) and not df.empty:
-                st.dataframe(df)
-
-                with st.expander("📊 Visualize this result"):
-                    # Detect numeric columns for Y axis
+                st.dataframe(df, use_container_width=True)
+                
+                # Visualization
+                with st.expander("📊 Visualize Results"):
                     numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
                     all_cols = df.columns.tolist()
-
-                    chart_type = st.selectbox(
-                        "Chart type",
-                        ["Line", "Bar", "Area", "Pie", "Donut", "Funnel"],
-                        index=0,
-                        key="chart_type_selector",
-                    )
-
-                    x_col = st.selectbox(
-                        "X axis",
-                        options=all_cols,
-                        key="x_axis_selector",
-                    )
-
-                    y_col = st.selectbox(
-                        "Y axis (numeric)",
-                        options=numeric_cols,
-                        index=0 if numeric_cols else None,
-                        key="y_axis_selector",
-                    )
-
-                    if not numeric_cols:
-                        st.warning("No numeric columns available for Y axis.")
-                    elif x_col == y_col:
-                        st.warning("X axis and Y axis must be different columns.")
-                    else:
                     
-                        if chart_type == "Line":
-                            st.line_chart(df, x=x_col, y=y_col)
-                        elif chart_type == "Bar":
-                            st.bar_chart(df, x=x_col, y=y_col)
-                        elif chart_type == "Donut":
-                            # Donut charts need categorical x and a numeric y (aggregated)
-                            if not numeric_cols:
-                                st.warning("No numeric column available for Donut chart.")
-                            else:
-                                st.write(f"Showing Donut chart for **{y_col}** grouped by **{x_col}**")
-
-                                # Aggregate data for donut
-                                donut_df = df.groupby(x_col)[y_col].sum().reset_index()
-
-                                donut_chart = (
-                                    alt.Chart(donut_df)
-                                    .mark_arc(innerRadius=70)  # innerRadius > 0 → donut
-                                    .encode(
-                                        theta=f"{y_col}:Q",
-                                        color=f"{x_col}:N",
-                                        tooltip=[x_col, y_col],
-                                    )
-                                    .properties(width=350, height=350)
-                                )
-
-                                st.altair_chart(donut_chart, use_container_width=False)    
-                        elif chart_type == "Pie":
-                            if not numeric_cols:
-                                st.warning("No numeric column available for Pie chart.")
-                            else:
-                                st.write(f"Showing Pie chart for **{y_col}** grouped by **{x_col}**")
-
-                                # Prepare data for Pie: group by x_col
-                                pie_df = df.groupby(x_col)[y_col].sum().reset_index()
-
-                                pie_chart = (
-                                    alt.Chart(pie_df)
-                                    .mark_arc()     # pie chart (no inner radius)
-                                    .encode(
-                                        theta=f"{y_col}:Q",
-                                        color=f"{x_col}:N",
-                                        tooltip=[x_col, y_col],
-                                    )
-                                    .properties(width=350, height=350)
-                                )
-
-                                st.altair_chart(pie_chart, use_container_width=False)    
-                        elif chart_type == "Funnel":
-                            if not numeric_cols:
-                                st.warning("No numeric column available for Funnel chart.")
-                            else:
-                                st.write(f"Showing Funnel chart for **{y_col}** by **{x_col}**")
-
-                                # Aggregate by stage (x_col)
-                                funnel_df = df.groupby(x_col)[y_col].sum().reset_index()
-
-                                # Sort from largest to smallest (typical funnel)
-                                funnel_df = funnel_df.sort_values(by=y_col, ascending=False)
-
-                                funnel_chart = (
-                                    alt.Chart(funnel_df)
-                                    .mark_bar()
-                                    .encode(
-                                        x=alt.X(f"{y_col}:Q", title=y_col),
-                                        y=alt.Y(f"{x_col}:N",
-                                                sort=funnel_df[x_col].tolist(),  # keep our sorted order
-                                                title=x_col),
-                                        tooltip=[x_col, y_col],
-                                    )
-                                    .properties(
-                                        width=500,
-                                        height=300,
-                                    )
-                                )
-
-                                st.altair_chart(funnel_chart, use_container_width=True)  
+                    if not numeric_cols:
+                        st.warning("No numeric columns available for visualization.")
+                    else:
+                        chart_type = st.selectbox(
+                            "Chart type",
+                            ["Bar", "Line", "Area", "Pie", "Donut"],
+                            key="result_chart_type"
+                        )
                         
-                        else:  # Area
-                            st.area_chart(df, x=x_col, y=y_col)
+                        x_col = st.selectbox("X axis", options=all_cols, key="result_x_axis")
+                        y_col = st.selectbox("Y axis (numeric)", options=numeric_cols, key="result_y_axis")
+                        
+                        if x_col != y_col:
+                            if chart_type == "Line":
+                                st.line_chart(df, x=x_col, y=y_col)
+                            elif chart_type == "Bar":
+                                st.bar_chart(df, x=x_col, y=y_col)
+                            elif chart_type == "Area":
+                                st.area_chart(df, x=x_col, y=y_col)
+                            elif chart_type in ["Pie", "Donut"]:
+                                agg_df = df.groupby(x_col)[y_col].sum().reset_index()
+                                inner_radius = 70 if chart_type == "Donut" else 0
+                                chart = (
+                                    alt.Chart(agg_df)
+                                    .mark_arc(innerRadius=inner_radius)
+                                    .encode(
+                                        theta=f"{y_col}:Q",
+                                        color=f"{x_col}:N",
+                                        tooltip=[x_col, y_col]
+                                    )
+                                    .properties(width=400, height=400)
+                                )
+                                st.altair_chart(chart, use_container_width=False)
+                        else:
+                            st.warning("X axis and Y axis must be different columns.")
 
 
-# ============================================================================
-# JSON PREVIEW
-# ============================================================================
-st.markdown("---")
-st.subheader("📄 JSON Preview")
-with st.expander("View Raw JSON", expanded=False):
-    st.json(st.session_state.schema_data)

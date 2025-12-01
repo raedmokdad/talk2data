@@ -1,0 +1,110 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_shipment",
+        "role": "fact",
+        "grain": "one row per shipment",
+        "columns": {
+          "shipment_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "origin_key": "INT - Foreign key to dim_location (origin)",
+          "destination_key": "INT - Foreign key to dim_location (destination)",
+          "carrier_key": "INT - Foreign key to dim_carrier",
+          "vehicle_key": "INT - Foreign key to dim_vehicle",
+          "weight_kg": "DECIMAL(10,2) - Shipment weight",
+          "distance_km": "DECIMAL(10,2) - Distance traveled",
+          "delivery_cost": "DECIMAL(10,2) - Cost of delivery",
+          "is_on_time": "BOOLEAN - TRUE if delivered on time"
+        },
+        "primary_key": "shipment_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "origin_key": "dim_location.location_key",
+          "destination_key": "dim_location.location_key",
+          "carrier_key": "dim_carrier.carrier_key",
+          "vehicle_key": "dim_vehicle.vehicle_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_location",
+        "role": "dimension",
+        "grain": "one row per location",
+        "columns": {
+          "location_key": "INT - Surrogate key",
+          "location_name": "VARCHAR - Location name",
+          "city": "VARCHAR - City",
+          "country": "VARCHAR - Country",
+          "warehouse_type": "VARCHAR - Warehouse type"
+        },
+        "primary_key": "location_key"
+      },
+      {
+        "name": "dim_carrier",
+        "role": "dimension",
+        "grain": "one row per carrier",
+        "columns": {
+          "carrier_key": "INT - Surrogate key",
+          "carrier_name": "VARCHAR - Carrier name",
+          "service_level": "VARCHAR - Service level"
+        },
+        "primary_key": "carrier_key"
+      },
+      {
+        "name": "dim_vehicle",
+        "role": "dimension",
+        "grain": "one row per vehicle",
+        "columns": {
+          "vehicle_key": "INT - Surrogate key",
+          "vehicle_id": "VARCHAR - Vehicle ID",
+          "vehicle_type": "VARCHAR - Vehicle type",
+          "capacity_kg": "INT - Vehicle capacity"
+        },
+        "primary_key": "vehicle_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_shipment.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_shipment.carrier_key", "to": "dim_carrier.carrier_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_shipment.vehicle_key", "to": "dim_vehicle.vehicle_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_shipment.origin_key", "to": "dim_location.location_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_shipment.destination_key", "to": "dim_location.location_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "lieferung": {"column": "shipment_id", "table": "fact_shipment"},
+    "spediteur": {"column": "carrier_name", "table": "dim_carrier"},
+    "gewicht": {"column": "weight_kg", "table": "fact_shipment"}
+  },
+  "kpis": {
+    "on_time_rate": {
+      "formula": "SUM(CASE WHEN fact_shipment.is_on_time = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "On-time delivery rate",
+      "required_tables": ["fact_shipment"]
+    },
+    "cost_per_km": {
+      "formula": "SUM(fact_shipment.delivery_cost) / NULLIF(SUM(fact_shipment.distance_km), 0)",
+      "description": "Cost per kilometer",
+      "required_tables": ["fact_shipment"]
+    },
+    "average_weight": {
+      "formula": "AVG(fact_shipment.weight_kg)",
+      "description": "Average shipment weight",
+      "required_tables": ["fact_shipment"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

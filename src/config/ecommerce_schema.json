@@ -1,24 +1,111 @@
 {
-    "table": "ecommerce_orders",
-    "columns": {
-        "order_id": "INTEGER - Unique order identifier",
-        "customer_id": "INTEGER - Customer ID (foreign key)",
-        "order_date": "DATE - When the order was placed",
-        "product_name": "VARCHAR(200) - Name of the product",
-        "category": "VARCHAR(100) - Product category (Electronics, Clothing, Books, etc.)",
-        "quantity": "INTEGER - Number of items ordered",
-        "unit_price": "DECIMAL(10,2) - Price per item in EUR",
-        "total_amount": "DECIMAL(10,2) - Total order value (quantity * unit_price)",
-        "payment_method": "VARCHAR(50) - Payment type (Credit Card, PayPal, Bank Transfer)",
-        "shipping_country": "VARCHAR(100) - Destination country",
-        "order_status": "VARCHAR(50) - Status (Pending, Shipped, Delivered, Cancelled)"
-    },
-    "notes": [
-        "Use date() function for date comparisons",
-        "Always include LIMIT clause for large results",
-        "Order dates range from 2020-01-01 onwards",
-        "Total amount is always quantity * unit_price",
-        "Categories: Electronics, Clothing, Books, Home & Garden, Sports",
-        "Valid statuses: Pending, Shipped, Delivered, Cancelled"
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_orders",
+        "role": "fact",
+        "grain": "one row per order line item",
+        "columns": {
+          "order_line_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "customer_key": "INT - Foreign key to dim_customer",
+          "product_key": "INT - Foreign key to dim_product",
+          "payment_key": "INT - Foreign key to dim_payment",
+          "quantity": "INT - Quantity ordered",
+          "unit_price": "DECIMAL(10,2) - Price per unit",
+          "shipping_cost": "DECIMAL(10,2) - Shipping cost",
+          "discount_amount": "DECIMAL(10,2) - Discount applied",
+          "is_returned": "BOOLEAN - TRUE if returned"
+        },
+        "primary_key": "order_line_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "customer_key": "dim_customer.customer_key",
+          "product_key": "dim_product.product_key",
+          "payment_key": "dim_payment.payment_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month",
+          "quarter": "INT - Quarter"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_customer",
+        "role": "dimension",
+        "grain": "one row per customer",
+        "columns": {
+          "customer_key": "INT - Surrogate key",
+          "customer_id": "VARCHAR - Customer ID",
+          "country": "VARCHAR - Customer country",
+          "registration_date": "DATE - Registration date",
+          "loyalty_tier": "VARCHAR - Loyalty tier"
+        },
+        "primary_key": "customer_key"
+      },
+      {
+        "name": "dim_product",
+        "role": "dimension",
+        "grain": "one row per product",
+        "columns": {
+          "product_key": "INT - Surrogate key",
+          "product_name": "VARCHAR - Product name",
+          "category": "VARCHAR - Product category",
+          "brand": "VARCHAR - Brand name",
+          "supplier": "VARCHAR - Supplier name"
+        },
+        "primary_key": "product_key"
+      },
+      {
+        "name": "dim_payment",
+        "role": "dimension",
+        "grain": "one row per payment method",
+        "columns": {
+          "payment_key": "INT - Surrogate key",
+          "payment_method": "VARCHAR - Payment method",
+          "provider": "VARCHAR - Payment provider"
+        },
+        "primary_key": "payment_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_orders.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_orders.customer_key", "to": "dim_customer.customer_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_orders.product_key", "to": "dim_product.product_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_orders.payment_key", "to": "dim_payment.payment_key", "join_type": "LEFT JOIN"}
     ]
+  },
+  "synonyms": {
+    "kunde": {"column": "customer_id", "table": "dim_customer"},
+    "bestellung": {"column": "order_line_id", "table": "fact_orders"},
+    "preis": {"column": "unit_price", "table": "fact_orders"},
+    "retoure": {"column": "is_returned", "table": "fact_orders"}
+  },
+  "kpis": {
+    "net_revenue": {
+      "formula": "SUM((fact_orders.quantity * fact_orders.unit_price) - fact_orders.discount_amount)",
+      "description": "Total net revenue",
+      "required_tables": ["fact_orders"]
+    },
+    "return_rate": {
+      "formula": "SUM(CASE WHEN fact_orders.is_returned = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Order return rate",
+      "required_tables": ["fact_orders"]
+    },
+    "average_order_value": {
+      "formula": "AVG(fact_orders.quantity * fact_orders.unit_price)",
+      "description": "Average order value",
+      "required_tables": ["fact_orders"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
 }

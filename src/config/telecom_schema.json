@@ -1,0 +1,109 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_call",
+        "role": "fact",
+        "grain": "one row per call",
+        "columns": {
+          "call_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "customer_key": "INT - Foreign key to dim_customer",
+          "plan_key": "INT - Foreign key to dim_plan",
+          "tower_key": "INT - Foreign key to dim_tower",
+          "call_duration_seconds": "INT - Call duration",
+          "data_usage_mb": "DECIMAL(10,2) - Data usage",
+          "sms_count": "INT - SMS count",
+          "call_cost": "DECIMAL(10,4) - Call cost",
+          "is_roaming": "BOOLEAN - TRUE if roaming"
+        },
+        "primary_key": "call_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "customer_key": "dim_customer.customer_key",
+          "plan_key": "dim_plan.plan_key",
+          "tower_key": "dim_tower.tower_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month",
+          "day_of_week": "VARCHAR - Day name"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_customer",
+        "role": "dimension",
+        "grain": "one row per customer",
+        "columns": {
+          "customer_key": "INT - Surrogate key",
+          "customer_id": "VARCHAR - Customer ID",
+          "contract_type": "VARCHAR - Contract type",
+          "subscription_date": "DATE - Subscription date"
+        },
+        "primary_key": "customer_key"
+      },
+      {
+        "name": "dim_plan",
+        "role": "dimension",
+        "grain": "one row per plan",
+        "columns": {
+          "plan_key": "INT - Surrogate key",
+          "plan_name": "VARCHAR - Plan name",
+          "monthly_fee": "DECIMAL(10,2) - Monthly fee",
+          "data_limit_gb": "INT - Data limit"
+        },
+        "primary_key": "plan_key"
+      },
+      {
+        "name": "dim_tower",
+        "role": "dimension",
+        "grain": "one row per cell tower",
+        "columns": {
+          "tower_key": "INT - Surrogate key",
+          "tower_id": "VARCHAR - Tower ID",
+          "city": "VARCHAR - City",
+          "coverage_type": "VARCHAR - Coverage type"
+        },
+        "primary_key": "tower_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_call.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_call.customer_key", "to": "dim_customer.customer_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_call.plan_key", "to": "dim_plan.plan_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_call.tower_key", "to": "dim_tower.tower_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "anruf": {"column": "call_id", "table": "fact_call"},
+    "daten": {"column": "data_usage_mb", "table": "fact_call"},
+    "tarif": {"column": "plan_name", "table": "dim_plan"}
+  },
+  "kpis": {
+    "total_revenue": {
+      "formula": "SUM(fact_call.call_cost)",
+      "description": "Total call revenue",
+      "required_tables": ["fact_call"]
+    },
+    "roaming_rate": {
+      "formula": "SUM(CASE WHEN fact_call.is_roaming = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Roaming usage rate",
+      "required_tables": ["fact_call"]
+    },
+    "average_data_usage": {
+      "formula": "AVG(fact_call.data_usage_mb)",
+      "description": "Average data usage per call",
+      "required_tables": ["fact_call"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

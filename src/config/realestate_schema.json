@@ -1,0 +1,111 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_rental",
+        "role": "fact",
+        "grain": "one row per rental agreement",
+        "columns": {
+          "rental_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "property_key": "INT - Foreign key to dim_property",
+          "tenant_key": "INT - Foreign key to dim_tenant",
+          "agent_key": "INT - Foreign key to dim_agent",
+          "monthly_rent": "DECIMAL(10,2) - Monthly rent",
+          "security_deposit": "DECIMAL(10,2) - Security deposit",
+          "lease_duration_months": "INT - Lease duration",
+          "is_renewed": "BOOLEAN - TRUE if lease renewed"
+        },
+        "primary_key": "rental_id",
+        "foreign_keys": {
+          "date_key": "dim_date.date_key",
+          "property_key": "dim_property.property_key",
+          "tenant_key": "dim_tenant.tenant_key",
+          "agent_key": "dim_agent.agent_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "year": "INT - Year",
+          "month": "INT - Month",
+          "quarter": "INT - Quarter"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_property",
+        "role": "dimension",
+        "grain": "one row per property",
+        "columns": {
+          "property_key": "INT - Surrogate key",
+          "property_id": "VARCHAR - Property ID",
+          "property_type": "VARCHAR - Property type",
+          "bedrooms": "INT - Number of bedrooms",
+          "square_meters": "INT - Size in sqm",
+          "city": "VARCHAR - City",
+          "neighborhood": "VARCHAR - Neighborhood"
+        },
+        "primary_key": "property_key"
+      },
+      {
+        "name": "dim_tenant",
+        "role": "dimension",
+        "grain": "one row per tenant",
+        "columns": {
+          "tenant_key": "INT - Surrogate key",
+          "tenant_id": "VARCHAR - Tenant ID",
+          "occupation": "VARCHAR - Occupation",
+          "income_level": "VARCHAR - Income level"
+        },
+        "primary_key": "tenant_key"
+      },
+      {
+        "name": "dim_agent",
+        "role": "dimension",
+        "grain": "one row per agent",
+        "columns": {
+          "agent_key": "INT - Surrogate key",
+          "agent_name": "VARCHAR - Agent name",
+          "agency": "VARCHAR - Agency name",
+          "commission_rate": "DECIMAL(4,2) - Commission rate"
+        },
+        "primary_key": "agent_key"
+      }
+    ],
+    "relationships": [
+      {"from": "fact_rental.date_key", "to": "dim_date.date_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_rental.property_key", "to": "dim_property.property_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_rental.tenant_key", "to": "dim_tenant.tenant_key", "join_type": "LEFT JOIN"},
+      {"from": "fact_rental.agent_key", "to": "dim_agent.agent_key", "join_type": "LEFT JOIN"}
+    ]
+  },
+  "synonyms": {
+    "miete": {"column": "monthly_rent", "table": "fact_rental"},
+    "wohnung": {"column": "property_type", "table": "dim_property"},
+    "makler": {"column": "agent_name", "table": "dim_agent"}
+  },
+  "kpis": {
+    "total_revenue": {
+      "formula": "SUM(fact_rental.monthly_rent * fact_rental.lease_duration_months)",
+      "description": "Total rental revenue",
+      "required_tables": ["fact_rental"]
+    },
+    "renewal_rate": {
+      "formula": "SUM(CASE WHEN fact_rental.is_renewed = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Lease renewal rate",
+      "required_tables": ["fact_rental"]
+    },
+    "average_rent": {
+      "formula": "AVG(fact_rental.monthly_rent)",
+      "description": "Average monthly rent",
+      "required_tables": ["fact_rental"]
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}
