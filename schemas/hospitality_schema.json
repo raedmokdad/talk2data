@@ -1,0 +1,151 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "fact_booking",
+        "role": "fact",
+        "grain": "one row per hotel booking",
+        "columns": {
+          "booking_id": "BIGINT - Surrogate key",
+          "date_key": "INT - Foreign key to dim_date",
+          "guest_key": "INT - Foreign key to dim_guest",
+          "room_key": "INT - Foreign key to dim_room",
+          "hotel_key": "INT - Foreign key to dim_hotel",
+          "nights": "INT - Number of nights",
+          "room_rate": "DECIMAL(10,2) - Room rate per night",
+          "additional_charges": "DECIMAL(10,2) - Additional charges",
+          "discount_applied": "DECIMAL(10,2) - Discount amount",
+          "is_cancelled": "BOOLEAN - TRUE if cancelled"
+        },
+        "primary_key": "booking_id",
+        "foreign_keys": {
+          "hotel_key": "dim_hotel.hotel_key",
+          "room_key": "dim_room.room_key",
+          "guest_key": "dim_guest.guest_key",
+          "date_key": "dim_date.date_key"
+        }
+      },
+      {
+        "name": "dim_date",
+        "role": "dimension",
+        "grain": "one row per date",
+        "columns": {
+          "date_key": "INT - Surrogate key",
+          "date": "DATE - Calendar date",
+          "month": "INT - Month",
+          "is_holiday": "BOOLEAN - TRUE if holiday",
+          "year": "INT - Year"
+        },
+        "primary_key": "date_key"
+      },
+      {
+        "name": "dim_guest",
+        "role": "dimension",
+        "grain": "one row per guest",
+        "columns": {
+          "guest_key": "INT - Surrogate key",
+          "guest_id": "VARCHAR - Guest ID",
+          "country": "VARCHAR - Guest country",
+          "loyalty_status": "VARCHAR - Loyalty status"
+        },
+        "primary_key": "guest_key"
+      },
+      {
+        "name": "dim_room",
+        "role": "dimension",
+        "grain": "one row per room type",
+        "columns": {
+          "room_key": "INT - Surrogate key",
+          "room_type": "VARCHAR - Room type",
+          "capacity": "INT - Room capacity",
+          "amenities": "VARCHAR - Amenities"
+        },
+        "primary_key": "room_key"
+      },
+      {
+        "name": "dim_hotel",
+        "role": "dimension",
+        "grain": "one row per hotel",
+        "columns": {
+          "hotel_key": "INT - Surrogate key",
+          "hotel_name": "VARCHAR - Hotel name",
+          "city": "VARCHAR - City",
+          "star_rating": "INT - Star rating"
+        },
+        "primary_key": "hotel_key"
+      }
+    ],
+    "notes": [],
+    "relationships": [
+      {
+        "from": "fact_booking.date_key",
+        "to": "dim_date.date_key",
+        "join_type": "LEFT JOIN",
+        "description": ""
+      },
+      {
+        "from": "fact_booking.guest_key",
+        "to": "dim_guest.guest_key",
+        "join_type": "LEFT JOIN",
+        "description": ""
+      },
+      {
+        "from": "fact_booking.room_key",
+        "to": "dim_room.room_key",
+        "join_type": "LEFT JOIN",
+        "description": ""
+      },
+      {
+        "from": "fact_booking.hotel_key",
+        "to": "dim_hotel.hotel_key",
+        "join_type": "LEFT JOIN",
+        "description": ""
+      }
+    ]
+  },
+  "synonyms": {
+    "buchung": {
+      "column": "booking_id",
+      "table": "fact_booking",
+      "description": ""
+    },
+    "gast": {
+      "column": "guest_id",
+      "table": "dim_guest",
+      "description": ""
+    },
+    "zimmer": {
+      "column": "room_type",
+      "table": "dim_room",
+      "description": ""
+    }
+  },
+  "kpis": {
+    "total_revenue": {
+      "formula": "SUM((fact_booking.nights * fact_booking.room_rate + fact_booking.additional_charges) - fact_booking.discount_applied)",
+      "description": "Total booking revenue",
+      "required_tables": [
+        "fact_booking"
+      ],
+      "keywords": []
+    },
+    "cancellation_rate": {
+      "formula": "SUM(CASE WHEN fact_booking.is_cancelled = TRUE THEN 1 ELSE 0 END) / COUNT(*)",
+      "description": "Booking cancellation rate",
+      "required_tables": [
+        "fact_booking"
+      ],
+      "keywords": []
+    },
+    "average_stay": {
+      "formula": "AVG(fact_booking.nights)",
+      "description": "Average length of stay",
+      "required_tables": [
+        "fact_booking"
+      ],
+      "keywords": []
+    }
+  },
+  "examples": [],
+  "glossary": {}
+}

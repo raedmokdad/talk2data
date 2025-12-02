@@ -46,18 +46,19 @@ try:
     AUTH_AVAILABLE = True
 except ImportError:
     AUTH_AVAILABLE = False
-    st.warning("⚠️ Authentication module not available. Running in demo mode.")
 
 # Initialize session state
 if 'schema_data' not in st.session_state:
     st.session_state.schema_data = {
         "schema": {
             "tables": [],
-            "relationships": [],
-            "metrics": {},
-            "examples": [],
-            "glossary": {}
-        }
+            "notes": [],
+            "relationships": []
+        },
+        "synonyms": {},
+        "kpis": {},
+        "examples": [],
+        "glossary": {}
     }
 
 if 'current_table' not in st.session_state:
@@ -204,9 +205,6 @@ def show_login_page():
                         st.error("Passwords don't match!")
                 else:
                     st.warning("Please fill all fields")
-        
-        st.markdown("---")
-        st.info("💡 **Demo Mode**: You can also skip login and use the builder without authentication.")
 
 
 def load_schema_template():
@@ -226,15 +224,7 @@ def load_schema_template():
 
 # Show login page if auth is available and user not authenticated
 if AUTH_AVAILABLE and not st.session_state.authenticated:
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        show_login_page()
-    with col2:
-        st.markdown("### Quick Start")
-        if st.button("🚀 Skip Login (Demo Mode)", use_container_width=True):
-            st.session_state.authenticated = True
-            st.session_state.username = "raedmokdad"
-            st.rerun()
+    show_login_page()
     st.stop()
 
 # ============================================================================
@@ -603,15 +593,36 @@ if app_mode == "📝 Schema Builder":
     # ============================================================================
     # SCHEMA BUILDER: MAIN CONTENT TABS
     # ============================================================================
-
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "📊 Tables", 
-        "🔗 Relationships", 
-        "📈 Metrics", 
-        "💡 Examples", 
-        "📖 Glossary",
-        "🧪 Test SQL"
-    ])
+    
+    # Auto-detect schema type: flat table (1 table) vs OLAP (multiple tables)
+    num_tables = len(st.session_state.schema_data["schema"]["tables"])
+    is_flat_table = num_tables == 1
+    
+    # Conditionally show Relationships tab only for multi-table schemas
+    if is_flat_table:
+        tab_names = [
+            "📊 Tables", 
+            "📝 Notes",
+            "🔄 Synonyms",
+            "📈 KPIs", 
+            "💡 Examples", 
+            "📖 Glossary",
+            "🧪 Test SQL"
+        ]
+        tab1, tab2, tab4, tab5, tab6, tab7, tab8 = st.tabs(tab_names)
+        tab3 = None  # Relationships tab doesn't exist for flat tables
+    else:
+        tab_names = [
+            "📊 Tables", 
+            "📝 Notes",
+            "🔗 Relationships", 
+            "🔄 Synonyms",
+            "📈 KPIs", 
+            "💡 Examples", 
+            "📖 Glossary",
+            "🧪 Test SQL"
+        ]
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tab_names)
 
 # ============================================================================
     # TAB 1: TABLES
@@ -757,95 +768,267 @@ if app_mode == "📝 Schema Builder":
                             st.rerun()
 
     # ============================================================================
-    # TAB 2: RELATIONSHIPS
+    # TAB 2: NOTES
     # ============================================================================
     with tab2:
-        st.header("🔗 Table Relationships")
-        st.info("Relationships are auto-generated from foreign keys, but you can add custom notes here")
-    
-        # Display auto-detected relationships
-        st.subheader("Auto-Detected Relationships")
-        relationships = []
-        for table in st.session_state.schema_data["schema"]["tables"]:
-            if table['role'] == 'fact' and 'foreign_keys' in table:
-                for fk_col, fk_ref in table['foreign_keys'].items():
-                    relationships.append({
-                        "from": f"{table['name']}.{fk_col}",
-                        "to": fk_ref,
-                        "type": "many-to-one"
-                    })
-    
-        if relationships:
-            for rel in relationships:
-                st.markdown(f"- `{rel['from']}` → `{rel['to']}` ({rel['type']})")
+        st.header("📝 Schema Notes")
+        st.info("Add important notes about your schema (SQL hints, date formats, best practices)")
+        
+        # Add new note
+        col_note_a, col_note_b = st.columns([5, 1])
+        with col_note_a:
+            new_note = st.text_input(
+                "New Note",
+                placeholder="e.g., Always include LIMIT clause for large result sets",
+                key="new_note_input"
+            )
+        with col_note_b:
+            if st.button("➕ Add", key="add_note_btn", use_container_width=True):
+                if new_note:
+                    if 'notes' not in st.session_state.schema_data["schema"]:
+                        st.session_state.schema_data["schema"]["notes"] = []
+                    st.session_state.schema_data["schema"]["notes"].append(new_note)
+                    st.rerun()
+        
+        # Display existing notes
+        notes = st.session_state.schema_data["schema"].get("notes", [])
+        if notes:
+            st.subheader("Current Notes")
+            notes_to_delete = []
+            for idx, note in enumerate(notes):
+                col_x, col_y = st.columns([6, 1])
+                with col_x:
+                    st.markdown(f"• {note}")
+                with col_y:
+                    if st.button("🗑️", key=f"del_note_{idx}"):
+                        notes_to_delete.append(idx)
+            
+            for idx in reversed(notes_to_delete):
+                st.session_state.schema_data["schema"]["notes"].pop(idx)
+                st.rerun()
         else:
-            st.warning("No relationships found. Add foreign keys in the Tables tab.")
+            st.warning("No notes yet. Add some hints for better SQL generation!")
 
     # ============================================================================
-    # TAB 3: METRICS
+    # TAB 3: RELATIONSHIPS (only visible for multi-table schemas)
     # ============================================================================
-    with tab3:
-        st.header("📈 Predefined Metrics")
-        st.info("Define common calculations for your schema")
-    
-        # Add new metric
-        with st.expander("➕ Add New Metric", expanded=False):
-            metric_key = st.text_input("Metric Key", placeholder="total_revenue")
-            metric_formula = st.text_input("Formula", placeholder="SUM(fact_sales.sales_amount)")
-            metric_desc = st.text_input("Description", placeholder="Total revenue across all sales")
-            metric_tables = st.text_input("Required Tables (comma-separated)", placeholder="fact_sales, dim_date")
-            metric_keywords = st.text_input("Keywords (comma-separated)", placeholder="umsatz, revenue, total")
+    if tab3:  # Only render if tab exists (multi-table schema)
+        with tab3:
+            st.header("🔗 Table Relationships")
+            st.info("Define JOIN relationships between tables")
         
-            if st.button("Add Metric"):
-                if metric_key and metric_formula:
-                    if 'metrics' not in st.session_state.schema_data["schema"]:
-                        st.session_state.schema_data["schema"]["metrics"] = {}
-                
-                    st.session_state.schema_data["schema"]["metrics"][metric_key] = {
-                        "formula": metric_formula,
-                        "description": metric_desc,
-                        "required_tables": [t.strip() for t in metric_tables.split(",") if t.strip()],
-                        "keywords": [k.strip() for k in metric_keywords.split(",") if k.strip()]
+        # Add new relationship
+        with st.expander("➕ Add New Relationship", expanded=True):
+            col_rel_a, col_rel_b = st.columns(2)
+            with col_rel_a:
+                rel_from = st.text_input(
+                    "From (table.column)",
+                    placeholder="fact_sales.date_key",
+                    key="rel_from_input"
+                )
+            with col_rel_b:
+                rel_to = st.text_input(
+                    "To (table.column)",
+                    placeholder="dim_date.date_key",
+                    key="rel_to_input"
+                )
+            
+            col_rel_c, col_rel_d = st.columns(2)
+            with col_rel_c:
+                rel_join_type = st.selectbox(
+                    "Join Type",
+                    options=["LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN"],
+                    key="rel_join_type"
+                )
+            with col_rel_d:
+                rel_description = st.text_input(
+                    "Description",
+                    placeholder="Links sales to date dimension",
+                    key="rel_description"
+                )
+            
+            if st.button("➕ Add Relationship", use_container_width=True):
+                if rel_from and rel_to:
+                    if 'relationships' not in st.session_state.schema_data["schema"]:
+                        st.session_state.schema_data["schema"]["relationships"] = []
+                    
+                    st.session_state.schema_data["schema"]["relationships"].append({
+                        "from": rel_from,
+                        "to": rel_to,
+                        "join_type": rel_join_type,
+                        "description": rel_description
+                    })
+                    st.success("Relationship added!")
+                    st.rerun()
+        
+        # Display existing relationships
+        st.subheader("Defined Relationships")
+        relationships = st.session_state.schema_data["schema"].get("relationships", [])
+        
+        if relationships:
+            rels_to_delete = []
+            for idx, rel in enumerate(relationships):
+                col_x, col_y, col_z = st.columns([5, 4, 1])
+                with col_x:
+                    st.markdown(f"`{rel.get('from', '')}` → `{rel.get('to', '')}`")
+                with col_y:
+                    st.caption(f"{rel.get('join_type', 'LEFT JOIN')} | {rel.get('description', '')}")
+                with col_z:
+                    if st.button("🗑️", key=f"del_rel_{idx}"):
+                        rels_to_delete.append(idx)
+            
+            for idx in reversed(rels_to_delete):
+                st.session_state.schema_data["schema"]["relationships"].pop(idx)
+                st.rerun()
+        else:
+            st.warning("No relationships defined yet.")
+    
+    # ============================================================================
+    # TAB 4: SYNONYMS
+    # ============================================================================
+    with tab4:
+        st.header("🔄 Synonyms")
+        st.info("Map natural language terms to database columns (important for German/English support)")
+        
+        # Add new synonym
+        with st.expander("➕ Add New Synonym", expanded=True):
+            col_syn_a, col_syn_b = st.columns(2)
+            with col_syn_a:
+                syn_term = st.text_input(
+                    "Term (natural language)",
+                    placeholder="umsatz",
+                    key="syn_term_input"
+                )
+            with col_syn_b:
+                syn_column = st.text_input(
+                    "Column",
+                    placeholder="sales_amount",
+                    key="syn_column_input"
+                )
+            
+            col_syn_c, col_syn_d = st.columns(2)
+            with col_syn_c:
+                syn_table = st.text_input(
+                    "Table",
+                    placeholder="fact_sales",
+                    key="syn_table_input"
+                )
+            with col_syn_d:
+                syn_desc = st.text_input(
+                    "Description",
+                    placeholder="Gross sales amount",
+                    key="syn_desc_input"
+                )
+            
+            if st.button("➕ Add Synonym", use_container_width=True):
+                if syn_term and syn_column and syn_table:
+                    if 'synonyms' not in st.session_state.schema_data:
+                        st.session_state.schema_data["synonyms"] = {}
+                    
+                    st.session_state.schema_data["synonyms"][syn_term.lower()] = {
+                        "column": syn_column,
+                        "table": syn_table,
+                        "description": syn_desc
                     }
-                    st.success(f"Metric '{metric_key}' added!")
+                    st.success(f"Synonym '{syn_term}' added!")
+                    st.rerun()
+        
+        # Display existing synonyms
+        st.subheader("Defined Synonyms")
+        synonyms = st.session_state.schema_data.get("synonyms", {})
+        
+        if synonyms:
+            syns_to_delete = []
+            for term, details in synonyms.items():
+                col_x, col_y, col_z = st.columns([2, 5, 1])
+                with col_x:
+                    st.markdown(f"**{term}**")
+                with col_y:
+                    st.caption(f"→ {details.get('table', '')}.{details.get('column', '')} ({details.get('description', '')})")
+                with col_z:
+                    if st.button("🗑️", key=f"del_syn_{term}"):
+                        syns_to_delete.append(term)
+            
+            for term in syns_to_delete:
+                del st.session_state.schema_data["synonyms"][term]
+                st.rerun()
+        else:
+            st.warning("No synonyms defined yet. Add terms like 'umsatz' → 'sales_amount'")
+
+    # ============================================================================
+    # TAB 5: KPIs
+    # ============================================================================
+    with tab5:
+        st.header("📈 KPIs (Key Performance Indicators)")
+        st.info("Define common business calculations")
+    
+        # Add new KPI
+        with st.expander("➕ Add New KPI", expanded=False):
+            kpi_key = st.text_input("KPI Key", placeholder="net_sales", key="kpi_key_input")
+            kpi_formula = st.text_input("Formula", placeholder="SUM(fact_sales.sales_amount - fact_sales.discount_amount)", key="kpi_formula_input")
+            kpi_desc = st.text_input("Description", placeholder="Total sales after discounts", key="kpi_desc_input")
+            kpi_group_by = st.text_input("Group By (optional)", placeholder="dim_store.store_name", key="kpi_groupby_input")
+            kpi_tables = st.text_input("Required Tables (comma-separated)", placeholder="fact_sales, dim_store", key="kpi_tables_input")
+            kpi_keywords = st.text_input("Keywords (comma-separated)", placeholder="nettoumsatz, netto, bereinigter umsatz", key="kpi_keywords_input")
+        
+            if st.button("Add KPI", key="add_kpi_btn"):
+                if kpi_key and kpi_formula:
+                    if 'kpis' not in st.session_state.schema_data:
+                        st.session_state.schema_data["kpis"] = {}
+                    
+                    kpi_data = {
+                        "formula": kpi_formula,
+                        "description": kpi_desc,
+                        "required_tables": [t.strip() for t in kpi_tables.split(",") if t.strip()],
+                        "keywords": [k.strip() for k in kpi_keywords.split(",") if k.strip()]
+                    }
+                    if kpi_group_by:
+                        kpi_data["group_by"] = kpi_group_by
+                    
+                    st.session_state.schema_data["kpis"][kpi_key] = kpi_data
+                    st.success(f"KPI '{kpi_key}' added!")
                     st.rerun()
     
-        # Display existing metrics
-        metrics = st.session_state.schema_data["schema"].get("metrics", {})
-        if metrics:
-            metrics_to_delete = []
-            for key, value in metrics.items():
+        # Display existing KPIs
+        kpis = st.session_state.schema_data.get("kpis", {})
+        if kpis:
+            kpis_to_delete = []
+            for key, value in kpis.items():
                 with st.expander(f"**{key}**"):
                     st.code(value.get('formula', ''), language='sql')
                     st.markdown(f"**Description:** {value.get('description', '')}")
+                    if value.get('group_by'):
+                        st.markdown(f"**Group By:** {value.get('group_by')}")
                     st.markdown(f"**Tables:** {', '.join(value.get('required_tables', []))}")
                     st.markdown(f"**Keywords:** {', '.join(value.get('keywords', []))}")
                 
-                    if st.button(f"🗑️ Delete", key=f"del_metric_{key}"):
-                        metrics_to_delete.append(key)
+                    if st.button(f"🗑️ Delete", key=f"del_kpi_{key}"):
+                        kpis_to_delete.append(key)
         
-            for key in metrics_to_delete:
-                del st.session_state.schema_data["schema"]["metrics"][key]
+            for key in kpis_to_delete:
+                del st.session_state.schema_data["kpis"][key]
                 st.rerun()
+        else:
+            st.info("No KPIs defined yet. Add common business calculations!")
 
     # ============================================================================
-    # TAB 4: EXAMPLES
+    # TAB 6: EXAMPLES
     # ============================================================================
-    with tab4:
+    with tab6:
         st.header("💡 SQL Examples")
         st.info("Provide example queries to help the LLM understand your schema")
     
         # Add new example
         with st.expander("➕ Add New Example", expanded=False):
-            example_desc = st.text_input("Description", placeholder="Monthly sales by region")
-            example_sql = st.text_area("SQL Pattern", placeholder="SELECT ... FROM ... WHERE ...", height=100)
+            example_desc = st.text_input("Description", placeholder="Monthly sales by region", key="example_desc_input")
+            example_sql = st.text_area("SQL Pattern", placeholder="SELECT ... FROM ... WHERE ...", height=100, key="example_sql_input")
         
-            if st.button("Add Example"):
+            if st.button("Add Example", key="add_example_btn"):
                 if example_desc and example_sql:
-                    if 'examples' not in st.session_state.schema_data["schema"]:
-                        st.session_state.schema_data["schema"]["examples"] = []
+                    if 'examples' not in st.session_state.schema_data:
+                        st.session_state.schema_data["examples"] = []
                 
-                    st.session_state.schema_data["schema"]["examples"].append({
+                    st.session_state.schema_data["examples"].append({
                         "description": example_desc,
                         "pattern": example_sql
                     })
@@ -853,7 +1036,7 @@ if app_mode == "📝 Schema Builder":
                     st.rerun()
     
         # Display existing examples
-        examples = st.session_state.schema_data["schema"].get("examples", [])
+        examples = st.session_state.schema_data.get("examples", [])
         if examples:
             examples_to_delete = []
             for idx, example in enumerate(examples):
@@ -864,33 +1047,35 @@ if app_mode == "📝 Schema Builder":
                         examples_to_delete.append(idx)
         
             for idx in reversed(examples_to_delete):
-                st.session_state.schema_data["schema"]["examples"].pop(idx)
+                st.session_state.schema_data["examples"].pop(idx)
                 st.rerun()
+        else:
+            st.info("No examples yet. Add SQL patterns to help with query generation!")
 
     # ============================================================================
-    # TAB 5: GLOSSARY
+    # TAB 7: GLOSSARY
     # ============================================================================
-    with tab5:
+    with tab7:
         st.header("📖 Glossary")
         st.info("Define business terms and their meanings")
     
         # Add new term
         col_a, col_b, col_c = st.columns([2, 5, 1])
         with col_a:
-            new_term = st.text_input("Term", placeholder="net_sales")
+            new_term = st.text_input("Term", placeholder="net_sales", key="glossary_term_input")
         with col_b:
-            new_definition = st.text_input("Definition", placeholder="Sales after discounts and returns")
+            new_definition = st.text_input("Definition", placeholder="Sales after discounts and returns", key="glossary_def_input")
         with col_c:
-            if st.button("➕ Add"):
+            if st.button("➕ Add", key="add_glossary_btn"):
                 if new_term and new_definition:
-                    if 'glossary' not in st.session_state.schema_data["schema"]:
-                        st.session_state.schema_data["schema"]["glossary"] = {}
+                    if 'glossary' not in st.session_state.schema_data:
+                        st.session_state.schema_data["glossary"] = {}
                 
-                    st.session_state.schema_data["schema"]["glossary"][new_term] = new_definition
+                    st.session_state.schema_data["glossary"][new_term] = new_definition
                     st.rerun()
     
         # Display existing terms
-        glossary = st.session_state.schema_data["schema"].get("glossary", {})
+        glossary = st.session_state.schema_data.get("glossary", {})
         if glossary:
             terms_to_delete = []
             for term, definition in glossary.items():
@@ -904,13 +1089,15 @@ if app_mode == "📝 Schema Builder":
                         terms_to_delete.append(term)
         
             for term in terms_to_delete:
-                del st.session_state.schema_data["schema"]["glossary"][term]
+                del st.session_state.schema_data["glossary"][term]
                 st.rerun()
+        else:
+            st.info("No glossary terms yet. Define business terms!")
 
     # ============================================================================
-    # TAB 6: TEST SQL
+    # TAB 8: TEST SQL
     # ============================================================================
-    with tab6:
+    with tab8:
         st.header("🧪 Test Your Schema with SQL Generation")
         st.info("Select a schema from S3 and ask questions to generate SQL")
     
@@ -1024,57 +1211,6 @@ if app_mode == "📝 Schema Builder":
                         max_value=5,
                         value=2
                     )
-            
-            # Example Questions - Load from selected schema
-            st.markdown("**💡 Quick Examples:**")
-            
-            # Try to load examples from the selected schema
-            try:
-                from src.s3_service import get_user_schema
-                username = st.session_state.username or "raedmokdad"
-                selected_schema = st.session_state['selected_test_schema']
-                
-                success, schema_data = get_user_schema(username, selected_schema)
-                
-                if success and schema_data and 'schema' in schema_data:
-                    # Extract example descriptions from schema
-                    schema_examples = schema_data['schema'].get('examples', [])
-                    if schema_examples:
-                        example_questions = [ex.get('description', 'Example query') for ex in schema_examples[:4]]
-                    else:
-                        # Fallback to generic examples
-                        example_questions = [
-                            "Wie viel Umsatz insgesamt?",
-                            "Top 10 Produkte nach Umsatz",
-                            "Umsatz pro Store in 2023",
-                            "Durchschnittlicher Umsatz pro Tag"
-                        ]
-                else:
-                    # Fallback
-                    example_questions = [
-                        "Wie viel Umsatz insgesamt?",
-                        "Top 10 Produkte nach Umsatz",
-                        "Umsatz pro Store in 2023",
-                        "Durchschnittlicher Umsatz pro Tag"
-                    ]
-            except Exception as e:
-                # Fallback on error
-                example_questions = [
-                    "Wie viel Umsatz insgesamt?",
-                    "Top 10 Produkte nach Umsatz",
-                    "Umsatz pro Store in 2023",
-                    "Durchschnittlicher Umsatz pro Tag"
-                ]
-            
-            # Display example buttons (up to 4)
-            example_questions = example_questions[:4]  # Limit to 4
-            cols = st.columns(len(example_questions))
-            
-            for idx, (col, question) in enumerate(zip(cols, example_questions)):
-                with col:
-                    if st.button(question, key=f"example_{idx}", use_container_width=True):
-                        st.session_state['test_question'] = question
-                        st.rerun()
             
             # Question Input
             test_question = st.text_area(
