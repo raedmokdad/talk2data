@@ -7,6 +7,8 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 
+from src.constants import DEFAULT_LOCAL_USER, S3_SCHEMA_PREFIX
+
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,8 +29,8 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
     """Get current user from JWT token, or return default user for local development"""
     # Local development mode - no authentication required
     if credentials is None:
-        logger.info("No credentials provided, using default local user: raedmokdad")
-        return "raedmokdad"
+        logger.info(f"No credentials provided, using default local user: {DEFAULT_LOCAL_USER}")
+        return DEFAULT_LOCAL_USER
     
     try:
         token = credentials.credentials
@@ -36,7 +38,7 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
         username = payload.get("cognito:username") or payload.get("username")
         if not username:
             logger.warning("Username not found in token, falling back to default")
-            return "raedmokdad"
+            return DEFAULT_LOCAL_USER
         
         if '@' in username:
             username = username.split('@')[0]
@@ -46,7 +48,7 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
         return username
     except Exception as e:
         logger.warning(f"Token validation failed: {str(e)}, falling back to default user")
-        return "raedmokdad"
+        return DEFAULT_LOCAL_USER
         
    
 def get_s3_client():
@@ -67,7 +69,7 @@ def get_s3_client():
 
 def upload_user_schema(username: str, schema_name: str, schema_data: Dict[str, Any]) -> tuple[bool, str]:
     try:
-        key = f"schemas/{username}/{schema_name}.json"
+        key = f"{S3_SCHEMA_PREFIX}/{username}/{schema_name}.json"
         client = get_s3_client()
         client.put_object(
             Body = json.dumps(schema_data),
@@ -85,7 +87,7 @@ def list_user_schema(username: str) -> tuple[bool, List[str]]:
         client = get_s3_client()
         response = client.list_objects_v2(
             Bucket=S3_BUCKET,
-            Prefix=f"schemas/{username}/"
+            Prefix=f"{S3_SCHEMA_PREFIX}/{username}/"
         )
         
         files = []
@@ -101,7 +103,7 @@ def get_user_schema(username: str, schema_name: str) -> tuple[bool, Dict[str, An
         client = get_s3_client()
         response = client.get_object(
             Bucket=S3_BUCKET,
-            Key=f"schemas/{username}/{schema_name}.json"
+            Key=f"{S3_SCHEMA_PREFIX}/{username}/{schema_name}.json"
         )
 
         content = response['Body'].read().decode('utf-8') 
@@ -113,7 +115,7 @@ def get_user_schema(username: str, schema_name: str) -> tuple[bool, Dict[str, An
 def delete_user_schema(username: str, schema_name: str) -> tuple[bool, str]:
     try:
         client = get_s3_client()
-        key = f"schemas/{username}/{schema_name}.json"
+        key = f"{S3_SCHEMA_PREFIX}/{username}/{schema_name}.json"
         try:
             client.head_object(Bucket=S3_BUCKET, Key=key)
         except Exception as e:

@@ -14,9 +14,9 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 from s3_service import list_user_schema, get_user_schema, upload_user_schema, delete_user_schema, get_current_user
-
 from llm_sql_generator import generate_multi_table_sql
 from sql_validator import SQLValidator
+from constants import DEFAULT_SCHEMA_NAME, MAX_QUESTION_LENGTH
 
 
 logging.basicConfig(level=logging.INFO)
@@ -113,11 +113,11 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         if not request.question or not request.question.strip():
             raise HTTPException(status_code=400, detail="Question cannot be empty")
         
-        if len(request.question) > 500:
-            raise HTTPException(status_code=400, detail="Question too long (max 500 characters)")
+        if len(request.question) > MAX_QUESTION_LENGTH:
+            raise HTTPException(status_code=400, detail=f"Question too long (max {MAX_QUESTION_LENGTH} characters)")
         
         # Determine schema name to use
-        schema_name = request.schema_name if request.schema_name else "retial_star_schema"
+        schema_name = request.schema_name if request.schema_name else DEFAULT_SCHEMA_NAME
         
         # Load schema from S3 for current user (from auth)
         logger.info(f"Loading schema '{schema_name}' for user '{current_user}' from S3")

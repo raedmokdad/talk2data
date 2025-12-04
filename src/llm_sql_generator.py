@@ -1,30 +1,15 @@
-from openai import OpenAI
-import os
 import json
 import pathlib
-from dotenv import load_dotenv
 from typing import Dict, Tuple, Optional
 import logging
+
 from src.schema_parser import get_schema_parser, get_schema_parser_from_data
 from src.date_converter import extract_and_convert_dates
+from src.openai_client import get_openai_client
+from src.constants import OPENAI_MODEL, OPENAI_MAX_TOKENS_SQL, OPENAI_TEMPERATURE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
-
-
-load_dotenv()
-
-
-_client = None
-
-def get_openai_client():
-    global _client
-    if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        _client = OpenAI(api_key=api_key)
-    return _client
 
 
 _rossman_schema = None

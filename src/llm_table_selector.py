@@ -2,27 +2,11 @@ import json
 import pathlib
 import logging
 from typing import List
-from openai import OpenAI
-import os
-from dotenv import load_dotenv
 
+from src.openai_client import get_openai_client
+from src.constants import OPENAI_MODEL, OPENAI_TEMPERATURE
 
 logger = logging.getLogger(__name__)
-
-load_dotenv()
-
-_client = None
-
-def get_openai_client():
-    """
-    Get or create OpenAI client - Railway compatible"""
-    global _client
-    if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        _client = OpenAI(api_key=api_key)
-    return _client
 
 
 def load_prompt(prompt_name: str) -> str:
@@ -48,9 +32,9 @@ def select_tables(question: str, schema_summary: str) -> List[str]:
         
         client = get_openai_client()
         response = client.chat.completions.create(
-            model = "gpt-4o-mini",
-            messages = [{"role": "user", "content": prompt}],
-            temperature = 0.0,
+            model=OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=OPENAI_TEMPERATURE,
         )
         
         content = response.choices[0].message.content.strip()
