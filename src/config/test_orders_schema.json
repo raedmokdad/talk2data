@@ -1,0 +1,52 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "test_orders",
+        "role": "flat",
+        "grain": "one row per order",
+        "columns": {
+          "order_id": "INTEGER - Unique order identifier (Primary Key)",
+          "order_date": "DATE - Date when order was placed",
+          "customer_name": "VARCHAR - Full name of the customer",
+          "product": "VARCHAR - Product name (Laptop, Smartphone, Tablet, Monitor, Tastatur)",
+          "category": "VARCHAR - Product category (Electronics, Accessories, Office)",
+          "quantity": "INTEGER - Number of items ordered",
+          "unit_price": "NUMERIC - Price per unit in EUR",
+          "country": "VARCHAR - Customer country (Deutschland, Oesterreich, Schweiz)",
+          "status": "VARCHAR - Order status (completed, pending, cancelled)",
+          "total_amount": "NUMERIC - Total order amount (quantity * unit_price) in EUR"
+        },
+        "primary_key": "order_id"
+      }
+    ],
+    "relationships": [],
+    "metrics": {
+      "total_revenue": {
+        "formula": "SUM(total_amount)",
+        "description": "Total revenue from all orders",
+        "keywords": ["umsatz", "revenue", "einnahmen", "gesamtumsatz"]
+      },
+      "average_order_value": {
+        "formula": "AVG(total_amount)",
+        "description": "Average order value",
+        "keywords": ["durchschnitt", "average", "aov"]
+      },
+      "total_orders": {
+        "formula": "COUNT(*)",
+        "description": "Total number of orders",
+        "keywords": ["anzahl", "bestellungen", "orders"]
+      },
+      "items_sold": {
+        "formula": "SUM(quantity)",
+        "description": "Total items sold",
+        "keywords": ["artikel", "menge", "quantity"]
+      }
+    },
+    "glossary": {
+      "total_amount": "Gesamtbetrag einer Bestellung (Menge × Stückpreis)",
+      "status": "completed = abgeschlossen, pending = ausstehend, cancelled = storniert",
+      "category": "Electronics = Elektronik, Accessories = Zubehör, Office = Büro"
+    }
+  }
+}

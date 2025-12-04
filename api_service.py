@@ -119,20 +119,23 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         # Determine schema name to use
         schema_name = request.schema_name if request.schema_name else DEFAULT_SCHEMA_NAME
         
-        # Load schema from S3 for current user (from auth)
-        logger.info(f"Loading schema '{schema_name}' for user '{current_user}' from S3")
-        success, schema_data = get_user_schema(current_user, schema_name)
+        # Use username from request if provided, otherwise use authenticated user
+        username = request.username if request.username else current_user
+        
+        # Load schema from S3 for user
+        logger.info(f"Loading schema '{schema_name}' for user '{username}' from S3")
+        success, schema_data = get_user_schema(username, schema_name)
         
         if not success or not schema_data:
             # Fallback to local schema for testing
-            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{current_user}', using local fallback")
+            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{username}', using local fallback")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
                 schema_name=schema_name  # Local fallback
             )
         else:
             # Use S3 schema
-            logger.info(f"Using S3 schema '{schema_name}' for user '{current_user}'")
+            logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
                 schema_data=schema_data
