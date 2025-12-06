@@ -1472,12 +1472,35 @@ else:  # app_mode == "🔍 Database Query"
                         with st.spinner("🤖 Generating SQL from your question..."):
                             try:
                                 username = st.session_state.get('username', 'raedmokdad')
+                                connector = st.session_state.get("connector")
                                 
+                                # For file connections, adjust schema with actual table name
                                 payload = {
                                     "question": user_question,
-                                    "schema_name": selected_schema,
                                     "username": username
                                 }
+                                
+                                if connector and hasattr(connector, 'list_tables'):
+                                    tables = connector.list_tables()
+                                    if tables and len(tables) == 1:
+                                        # Single table - load schema and replace table name
+                                        from src.s3_service import get_user_schema
+                                        success, schema_data = get_user_schema(username, selected_schema)
+                                        
+                                        if success and schema_data:
+                                            schema_tables = schema_data.get("schema", {}).get("tables", [])
+                                            if len(schema_tables) == 1 and schema_tables[0].get("role") == "flat":
+                                                # Replace schema table name with actual table name
+                                                schema_tables[0]["name"] = tables[0]
+                                                payload["schema_data"] = schema_data
+                                            else:
+                                                payload["schema_name"] = selected_schema
+                                        else:
+                                            payload["schema_name"] = selected_schema
+                                    else:
+                                        payload["schema_name"] = selected_schema
+                                else:
+                                    payload["schema_name"] = selected_schema
                                 
                                 response = requests.post(f"{API_URL}/generate-sql", json=payload, timeout=30)
                                 

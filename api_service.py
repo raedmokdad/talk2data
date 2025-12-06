@@ -37,6 +37,7 @@ class QueryRequest(BaseModel):
     max_retries: int = Field(3, description="Maximum retry attempts")
     confidence_threshold: float = Field(0.7, description="Minimum confidence score")
     schema_name: Optional[str] = Field(None, description="Name of the schema to use")
+    schema_data: Optional[Dict[str, Any]] = Field(None, description="Schema data directly provided")
     username: Optional[str] = Field(None, description="Username for schema lookup")
 
 class QueryResponse(BaseModel):
@@ -116,30 +117,38 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         if len(request.question) > MAX_QUESTION_LENGTH:
             raise HTTPException(status_code=400, detail=f"Question too long (max {MAX_QUESTION_LENGTH} characters)")
         
-        # Determine schema name to use
-        schema_name = request.schema_name if request.schema_name else DEFAULT_SCHEMA_NAME
-        
         # Use username from request if provided, otherwise use authenticated user
         username = request.username if request.username else current_user
         
-        # Load schema from S3 for user
-        logger.info(f"Loading schema '{schema_name}' for user '{username}' from S3")
-        success, schema_data = get_user_schema(username, schema_name)
-        
-        if not success or not schema_data:
-            # Fallback to local schema for testing
-            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{username}', using local fallback")
+        # Check if schema_data is provided directly
+        if request.schema_data:
+            logger.info(f"Using schema_data provided directly in request")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
-                schema_name=schema_name  # Local fallback
+                schema_data=request.schema_data
             )
         else:
-            # Use S3 schema
-            logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
-            sql_query = generate_multi_table_sql(
-                user_question=request.question.strip(),
-                schema_data=schema_data
-            )
+            # Determine schema name to use
+            schema_name = request.schema_name if request.schema_name else DEFAULT_SCHEMA_NAME
+            
+            # Load schema from S3 for user
+            logger.info(f"Loading schema '{schema_name}' for user '{username}' from S3")
+            success, schema_data = get_user_schema(username, schema_name)
+            
+            if not success or not schema_data:
+                # Fallback to local schema for testing
+                logger.warning(f"Schema '{schema_name}' not found in S3 for user '{username}', using local fallback")
+                sql_query = generate_multi_table_sql(
+                    user_question=request.question.strip(),
+                    schema_name=schema_name  # Local fallback
+                )
+            else:
+                # Use S3 schema
+                logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
+                sql_query = generate_multi_table_sql(
+                    user_question=request.question.strip(),
+                    schema_data=schema_data
+                )
         
         # Validate SQL for security threats
         validator = SQLValidator()
