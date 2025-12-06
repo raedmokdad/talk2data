@@ -538,7 +538,18 @@ else:  # app_mode == "🔍 Database Query"
 
 
     # --- Connect button ---
-    if st.sidebar.button("Connect"):
+    col1, col2 = st.sidebar.columns([2, 1])
+    
+    with col1:
+        connect_clicked = st.button("Connect", use_container_width=True)
+    
+    with col2:
+        if st.session_state.get("connector"):
+            disconnect_clicked = st.button("Disconnect", use_container_width=True)
+        else:
+            disconnect_clicked = False
+    
+    if connect_clicked:
         try:
             selection = DBSelection(**selection_kwargs)
             connector = create_connector(selection)
@@ -547,6 +558,14 @@ else:  # app_mode == "🔍 Database Query"
             st.write("Available tables:", ", ".join(connector.list_tables()))
         except Exception as e:
             st.error(f"❌ Connection failed: {e}")
+    
+    if disconnect_clicked:
+        st.session_state["connector"] = None
+        st.session_state["last_df"] = None
+        st.session_state["last_sql"] = None
+        st.session_state["last_msg"] = None
+        st.info("🔌 Disconnected from database")
+        st.rerun()
     
     # --- Schema Selection for AI Query ---
     st.sidebar.markdown("---")
