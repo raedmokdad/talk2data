@@ -263,7 +263,7 @@ def generate_sql_with_validation(user_question: str, validator, rossmann_schema:
     return sql_query, confidence_score, validation_passed
 
 
-def generate_multi_table_sql(user_question: str, schema_name: str = None , schema_data: Dict = None, validator=None ) -> str:
+def generate_multi_table_sql(user_question: str, schema_name: str = None , schema_data: Dict = None, validator=None, actual_table_names: list = None ) -> str:
     try:
       
         processed_question = extract_and_convert_dates(user_question)
@@ -279,7 +279,7 @@ def generate_multi_table_sql(user_question: str, schema_name: str = None , schem
             raise ValueError("Both schema_data and schema_name are not available")
         
       
-        relevant_tables = parser.get_relevant_tables(processed_question)
+        relevant_tables = parser.get_relevant_tables(processed_question, actual_table_names)
         logger.info(f"Selected tables: {relevant_tables}")
         
         if not relevant_tables:

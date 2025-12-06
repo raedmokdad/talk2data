@@ -39,6 +39,7 @@ class QueryRequest(BaseModel):
     schema_name: Optional[str] = Field(None, description="Name of the schema to use")
     schema_data: Optional[Dict[str, Any]] = Field(None, description="Schema data directly provided")
     username: Optional[str] = Field(None, description="Username for schema lookup")
+    table_names: Optional[List[str]] = Field(None, description="Actual table names from database")
 
 class QueryResponse(BaseModel):
     sql_query: str
@@ -132,14 +133,16 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
             logger.warning(f"Schema '{schema_name}' not found in S3 for user '{username}', using local fallback")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
-                schema_name=schema_name  # Local fallback
+                schema_name=schema_name,  # Local fallback
+                actual_table_names=request.table_names
             )
         else:
             # Use S3 schema
             logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
             sql_query = generate_multi_table_sql(
                 user_question=request.question.strip(),
-                schema_data=schema_data
+                schema_data=schema_data,
+                actual_table_names=request.table_names
             )
         
         # Validate SQL for security threats

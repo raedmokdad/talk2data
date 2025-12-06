@@ -223,9 +223,14 @@ class SchemaParser:
     def validate_selected_tables(self, selected_tables: List[str]) -> Tuple[bool, str]:
         """
         Validates if all selected tables exist in the schema.
+        For flat tables (single table schemas), validation is skipped since actual DB table name may differ.
         """
         if not selected_tables:
             return False, "No tables were selected for the query"
+        
+        # For flat tables with single table, skip validation
+        if len(self.tables) == 1:
+            return True, ""
         
         missing_tables = [t for t in selected_tables if t not in self.tables]
         
@@ -276,11 +281,16 @@ class SchemaParser:
         return True, ""
     
   
-    def get_relevant_tables(self, question: str) -> List[str]:
+    def get_relevant_tables(self, question: str, actual_table_names: List[str] = None) -> List[str]:
         """
         Uses LLM to identify which tables are needed to answer the question.
+        For flat tables (single CSV), uses actual_table_names from database instead of schema names.
         If LLM return no valid values -> raise error
         """
+        # For flat tables with single table, use actual DB table name
+        if len(self.tables) == 1 and actual_table_names:
+            return actual_table_names
+        
         schema_summary = self.get_schema_summary()
         tables = select_tables(question, schema_summary)
         
