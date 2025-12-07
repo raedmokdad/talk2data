@@ -79,6 +79,81 @@ if 'current_schema_name' not in st.session_state:
 def get_connector() -> BaseConnector | None:
     return st.session_state.get("connector")
 
+def replace_table_names_in_sql(sql: str, schema_data: dict, connector: BaseConnector) -> str:
+    """
+    Replace schema table names in SQL with actual DuckDB table names.
+    Works for both single-table and multi-table schemas.
+    
+    Args:
+        sql: Generated SQL query with schema table names
+        schema_data: Schema JSON data containing table definitions
+        connector: Database connector with list_tables() method
+        
+    Returns:
+        Modified SQL with actual database table names
+    """
+    import re
+    
+    # Get schema table names
+    schema_tables = []
+    if schema_data and "schema" in schema_data:
+        tables = schema_data["schema"].get("tables", [])
+        schema_tables = [t.get("name", "") for t in tables if t.get("name")]
+    
+    # Get actual DB table names
+    db_tables = []
+    try:
+        db_tables = connector.list_tables()
+    except Exception as e:
+        # If we can't get DB tables, return SQL unchanged
+        return sql
+    
+    if not schema_tables or not db_tables:
+        return sql
+    
+    # For single-table schemas (flat tables), map to first DB table
+    if len(schema_tables) == 1 and len(db_tables) == 1:
+        schema_table = schema_tables[0]
+        db_table = db_tables[0]
+        
+        # Replace all occurrences of schema table name with DB table name
+        # Use word boundaries to avoid partial replacements
+        pattern = r'\b' + re.escape(schema_table) + r'\b'
+        modified_sql = re.sub(pattern, db_table, sql, flags=re.IGNORECASE)
+        
+        return modified_sql
+    
+    # For multi-table schemas with multiple DB tables, try to match by name similarity
+    # This handles cases where file names don't match schema table names
+    if len(db_tables) > 0:
+        # Create a mapping by finding the most similar DB table for each schema table
+        from difflib import SequenceMatcher
+        
+        modified_sql = sql
+        for schema_table in schema_tables:
+            # Skip if schema table name already exists in DB
+            if schema_table in db_tables:
+                continue
+            
+            # Find the most similar DB table name
+            best_match = None
+            best_ratio = 0.0
+            
+            for db_table in db_tables:
+                ratio = SequenceMatcher(None, schema_table.lower(), db_table.lower()).ratio()
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_match = db_table
+            
+            # Only replace if we found a reasonable match (> 30% similarity)
+            if best_match and best_ratio > 0.3:
+                pattern = r'\b' + re.escape(schema_table) + r'\b'
+                modified_sql = re.sub(pattern, best_match, modified_sql, flags=re.IGNORECASE)
+        
+        return modified_sql
+    
+    return sql
+
 def create_default_table(table_type: str = "fact") -> Dict[str, Any]:
     """Create a default table template"""
     if table_type == "fact":
@@ -1180,6 +1255,16 @@ if app_mode == "📝 Schema Builder":
                         
                         # Automatically set the selected schema (no button needed)
                         st.session_state['selected_test_schema'] = selected_schema_name
+                        
+                        # Load schema data from S3 if not already loaded or if schema changed
+                        if (not st.session_state.get('selected_schema_data') or 
+                            st.session_state.get('loaded_schema_name') != selected_schema_name):
+                            from src.s3_service import get_user_schema
+                            load_success, schema_data = get_user_schema(username, selected_schema_name)
+                            if load_success:
+                                st.session_state['selected_schema_data'] = schema_data
+                                st.session_state['loaded_schema_name'] = selected_schema_name
+                        
                         st.success(f"✅ Using Schema: **{selected_schema_name}**")
                     
                     elif success:
@@ -1530,15 +1615,19 @@ else:  # app_mode == "🔍 Database Query"
                         
                         if run_nl_query:
                             try:
-                                lowered = generated_sql.strip().lower()
+                                # Replace schema table names with actual DB table names
+                                schema_data = st.session_state.get("selected_schema_data")
+                                executable_sql = replace_table_names_in_sql(generated_sql, schema_data, connector)
+                                
+                                lowered = executable_sql.strip().lower()
                                 if lowered.startswith("select"):
-                                    rows = connector.run_query(generated_sql)
+                                    rows = connector.run_query(executable_sql)
                                     df = pd.DataFrame(rows)
                                     st.session_state["last_df"] = df
                                     st.session_state["last_sql"] = generated_sql
                                     st.session_state["last_msg"] = f"✅ Returned {len(df)} rows"
                                 else:
-                                    connector.execute(generated_sql)
+                                    connector.execute(executable_sql)
                                     st.session_state["last_df"] = None
                                     st.session_state["last_sql"] = generated_sql
                                     st.session_state["last_msg"] = "✅ Statement executed successfully."

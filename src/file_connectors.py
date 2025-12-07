@@ -42,8 +42,13 @@ class FileConnector(BaseConnector):
         Register a single file (CSV or EXCEL) as a DuckDB table/view.
         """
         if file_item.s3_uri:
-            # Name from S3 key
-            name_stem = file_item.s3_uri.split("/")[-1].split(".")[0]
+            # Name from S3 key - extract just the filename
+            # Handle both S3 URIs and local paths that were put in s3_uri field
+            s3_path = file_item.s3_uri
+            # Get the last part after / or \
+            name_with_ext = s3_path.replace("\\", "/").split("/")[-1]
+            # Remove extension
+            name_stem = name_with_ext.rsplit(".", 1)[0]
         elif file_item.path:
             name_stem = Path(file_item.path).stem
         else:
