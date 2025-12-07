@@ -1,26 +1,47 @@
 {
-    "table": "employees",
-    "columns": {
-        "employee_id": "INTEGER - Unique employee identifier",
-        "first_name": "VARCHAR(100) - Employee first name",
-        "last_name": "VARCHAR(100) - Employee last name",
-        "email": "VARCHAR(200) - Employee email address",
-        "department": "VARCHAR(100) - Department name (IT, Sales, HR, Finance, Operations)",
-        "position": "VARCHAR(100) - Job title",
-        "hire_date": "DATE - Date when employee was hired",
-        "salary": "DECIMAL(10,2) - Annual salary in EUR",
-        "manager_id": "INTEGER - ID of direct manager (foreign key to employee_id)",
-        "office_location": "VARCHAR(100) - Office city",
-        "employment_status": "VARCHAR(50) - Status (Active, On Leave, Terminated)",
-        "performance_rating": "DECIMAL(3,2) - Last performance review score (0.00-5.00)"
+  "schema": {
+    "tables": [
+      {
+        "name": "employees",
+        "role": "flat",
+        "grain": "one row per employee",
+        "columns": {
+          "employee_id": "INTEGER - Unique employee identifier (Primary Key)",
+          "first_name": "VARCHAR - Employee first name",
+          "last_name": "VARCHAR - Employee last name",
+          "email": "VARCHAR - Employee email address",
+          "department": "VARCHAR - Department (IT, HR, Forschung, Marketing)",
+          "position": "VARCHAR - Job position",
+          "hire_date": "DATE - Hire date",
+          "salary": "NUMERIC - Annual salary in EUR",
+          "manager_id": "INTEGER - Manager ID (can be NULL)",
+          "location": "VARCHAR - Office location (Bonn, Köln)"
+        },
+        "primary_key": "employee_id"
+      }
+    ],
+    "relationships": [],
+    "metrics": {
+      "total_employees": {
+        "formula": "COUNT(*)",
+        "description": "Total number of employees",
+        "keywords": ["anzahl", "mitarbeiter", "employees", "total", "wie viele", "count"]
+      },
+      "average_salary": {
+        "formula": "AVG(salary)",
+        "description": "Average employee salary",
+        "keywords": ["durchschnitt", "durchschnittlich", "gehalt", "average", "salary", "mean"]
+      },
+      "total_salary": {
+        "formula": "SUM(salary)",
+        "description": "Total salary cost",
+        "keywords": ["gesamt", "gesamtgehalt", "summe", "lohnkosten", "total salary", "sum"]
+      }
     },
-    "notes": [
-        "Use date() function for date comparisons",
-        "Always include LIMIT clause for large results",
-        "Hire dates range from 2010-01-01 onwards",
-        "Departments: IT, Sales, HR, Finance, Operations",
-        "Performance ratings range from 0.00 to 5.00",
-        "Manager_id can be NULL for top-level executives",
-        "For tenure calculations: use julianday('now') - julianday(hire_date)"
-    ]
+    "glossary": {
+      "salary": "Annual salary in EUR",
+      "department": "IT, HR, Forschung, Marketing",
+      "location": "Bonn or Köln"
+    }
+  }
 }
