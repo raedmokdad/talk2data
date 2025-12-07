@@ -1473,19 +1473,10 @@ else:  # app_mode == "🔍 Database Query"
                             try:
                                 username = st.session_state.get('username', 'raedmokdad')
                                 
-                                # Get actual table names from connector
-                                table_names = None
-                                if st.session_state.get('connector'):
-                                    try:
-                                        table_names = st.session_state['connector'].list_tables()
-                                    except:
-                                        pass
-                                
                                 payload = {
                                     "question": user_question,
                                     "schema_name": selected_schema,
-                                    "username": username,
-                                    "table_names": table_names
+                                    "username": username
                                 }
                                 
                                 response = requests.post(f"{API_URL}/generate-sql", json=payload, timeout=30)

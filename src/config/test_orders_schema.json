@@ -2,7 +2,7 @@
   "schema": {
     "tables": [
       {
-        "name": "c_users_r",
+        "name": "test_orders",
         "role": "flat",
         "grain": "one row per order",
         "columns": {

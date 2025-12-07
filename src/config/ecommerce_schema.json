@@ -44,7 +44,7 @@
         "grain": "one row per customer",
         "columns": {
           "customer_key": "INT - Surrogate key",
-          "customer_id": "VARCHAR - Customer ID",
+          "customer_id": "c",
           "country": "VARCHAR - Customer country",
           "registration_date": "DATE - Registration date",
           "loyalty_tier": "VARCHAR - Loyalty tier"

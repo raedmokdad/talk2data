@@ -1,5 +1,3 @@
-# core/models.py
-
 from __future__ import annotations
 from enum import Enum
 from typing import Optional, List
@@ -20,14 +18,12 @@ class FileType(str, Enum):
 
 
 class FileItem(BaseModel):
-    # For local mode (optional)
     path: Optional[str] = None
-
-    # For S3 mode
-    s3_uri: Optional[str] = None  # e.g. s3://bucket/key.xlsx
+    s3_uri: Optional[str] = None  # s3://bucket/key.xlsx
 
     type: FileType
     sheet_name: Optional[str] = None
+    table_name: Optional[str] = None  # Override table name (default: filename stem)
 
 
 class DBSelection(BaseModel):
@@ -40,7 +36,6 @@ class DBSelection(BaseModel):
 
     db_type: DBType
 
-    # SQL DB fields
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
