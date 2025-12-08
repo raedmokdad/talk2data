@@ -129,17 +129,21 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         success, schema_data = get_user_schema(username, schema_name)
         
         if not success or not schema_data:
-            error_msg = f"Schema '{schema_name}' not found on S3 for user '{username}'. Available bucket: {os.getenv('S3_BUCKET')}, prefix: {os.getenv('S3_SCHEMA_PREFIX', 'schemas')}"
-            logger.error(error_msg)
-            raise HTTPException(status_code=404, detail=error_msg)
-        
-        # Use S3 schema
-        logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
-        sql_query = generate_multi_table_sql(
-            user_question=request.question.strip(),
-            schema_data=schema_data,
-            actual_table_names=request.table_names
-        )
+            # Fallback to local schema for testing
+            logger.warning(f"Schema '{schema_name}' not found in S3 for user '{username}', using local fallback")
+            sql_query = generate_multi_table_sql(
+                user_question=request.question.strip(),
+                schema_name=schema_name,  # Local fallback
+                actual_table_names=request.table_names
+            )
+        else:
+            # Use S3 schema
+            logger.info(f"Using S3 schema '{schema_name}' for user '{username}'")
+            sql_query = generate_multi_table_sql(
+                user_question=request.question.strip(),
+                schema_data=schema_data,
+                actual_table_names=request.table_names
+            )
         
         # Validate SQL for security threats
         validator = SQLValidator()
