@@ -6,41 +6,41 @@
         "role": "flat",
         "grain": "one row per applicant",
         "columns": {
-          "Last Name": "VARCHAR - Applicant's last name/surname. Column name: [Last Name]",
-          "Name(s)": "VARCHAR - Applicant's first name(s). Column name: [Name(s)]",
-          "Date of Birth (Y)": "INTEGER - Year of birth. Column name: [Date of Birth (Y)]",
-          "Country": "VARCHAR - Country of origin. Column name: Country",
-          "Gender (f / m / d)": "VARCHAR - Gender (f=female, m=male, d=diverse). Column name: [Gender (f / m / d)]",
-          "Present Position": "VARCHAR - Current job position or role. Column name: [Present Position]",
-          "Name of Home Institution": "VARCHAR - Name of applicant's home institution. Column name: [Name of Home Institution]",
-          "Location of Home Institution": "VARCHAR - Geographic location of home institution. Column name: [Location of Home Institution]",
-          "Contact E-Mail address": "VARCHAR - Email address for contact. Column name: [Contact E-Mail address]",
-          "Track (A / P)": "VARCHAR - Application track (A=Academic, P=Professional). Column name: [Track (A / P)]",
-          "Academic Degree(s) (and / or Training)": "VARCHAR - Academic qualifications and degrees. Column name: [Academic Degree(s) (and / or Training)]",
-          "Year of PhD": "INTEGER - Year when PhD was obtained. Column name: [Year of PhD]",
-          "Discipline": "VARCHAR - Academic or professional discipline. Column name: Discipline",
-          "Title of proposed project": "VARCHAR - Title of the fellowship project proposal. Column name: [Title of proposed project]",
-          "Thematic relation": "VARCHAR - How project relates to program themes. Column name: [Thematic relation]",
-          "Begin of Fellowship": "DATE - Proposed fellowship start date. Column name: [Begin of Fellowship]",
-          "End of Fellowship": "DATE - Proposed fellowship end date. Column name: [End of Fellowship]",
-          "Duration in month": "INTEGER - Fellowship duration in months. Column name: [Duration in month]",
-          "Advisory Board Reviewer 1": "VARCHAR - Name of first advisory board reviewer. Column name: [Advisory Board Reviewer 1]",
-          "Advisory Board Reviewer 2": "VARCHAR - Name of second advisory board reviewer. Column name: [Advisory Board Reviewer 2]",
-          "Review Katja": "VARCHAR - Review comments from Katja. Column name: [Review Katja]",
-          "Review Manuel": "VARCHAR - Review comments from Manuel. Column name: [Review Manuel]",
-          "Rating Katja": "VARCHAR - Rating grade from Katja (A, B, C, etc.). Column name: [Rating Katja]",
-          "Rating Manuel": "VARCHAR - Rating grade from Manuel (A, B, C, etc.). Column name: [Rating Manuel]",
-          "Comments": "VARCHAR - Additional comments or notes about the application. Column name: Comments"
+          "Last Name": "VARCHAR - Applicant's last name/surname. Use: [Last Name]",
+          "Name(s)": "VARCHAR - Applicant's first name(s). Use: [Name(s)]",
+          "Birth_Year": "INTEGER - Year of birth",
+          "Country": "VARCHAR - Country of origin",
+          "Gender": "VARCHAR - Gender (f=female, m=male, d=diverse)",
+          "Present Position": "VARCHAR - Current job position or role. Use: [Present Position]",
+          "Name of Home Institution": "VARCHAR - Name of applicant's home institution. Use: [Name of Home Institution]",
+          "Location of Home Institution": "VARCHAR - Geographic location of home institution. Use: [Location of Home Institution]",
+          "Contact E-Mail address": "VARCHAR - Email address for contact. Use: [Contact E-Mail address]",
+          "Track": "VARCHAR - Application track (A=Academic, P=Professional)",
+          "Academic Degree(s) (and / or Training)": "VARCHAR - Academic qualifications and degrees. Use: [Academic Degree(s) (and / or Training)]",
+          "PhD_Year": "INTEGER - Year when PhD was obtained",
+          "Discipline": "VARCHAR - Academic or professional discipline",
+          "Title of proposed project": "VARCHAR - Title of the fellowship project proposal. Use: [Title of proposed project]",
+          "Thematic relation": "VARCHAR - How project relates to program themes. Use: [Thematic relation]",
+          "Begin of Fellowship": "DATE - Proposed fellowship start date. Use: [Begin of Fellowship]",
+          "End of Fellowship": "DATE - Proposed fellowship end date. Use: [End of Fellowship]",
+          "Duration_Months": "INTEGER - Fellowship duration in months",
+          "Advisory Board Reviewer 1": "VARCHAR - Name of first advisory board reviewer. Use: [Advisory Board Reviewer 1]",
+          "Advisory Board Reviewer 2": "VARCHAR - Name of second advisory board reviewer. Use: [Advisory Board Reviewer 2]",
+          "Review Katja": "VARCHAR - Review comments from Katja. Use: [Review Katja]",
+          "Review Manuel": "VARCHAR - Review comments from Manuel. Use: [Review Manuel]",
+          "Rating Katja": "VARCHAR - Rating grade from Katja (A, B, C, etc.). Use: [Rating Katja]",
+          "Rating Manuel": "VARCHAR - Rating grade from Manuel (A, B, C, etc.). Use: [Rating Manuel]",
+          "Comments": "VARCHAR - Additional comments or notes about the application"
         },
         "primary_key": "Contact E-Mail address"
       }
     ],
     "relationships": [],
     "notes": [
-      "IMPORTANT: Column names with spaces or special characters MUST be enclosed in square brackets in SQL queries",
-      "Example: SELECT [Gender (f / m / d)], [Track (A / P)] FROM testlistAIA",
-      "Simple column names like Country, Discipline, Comments do NOT need brackets",
-      "Always use [Column Name] syntax for: Last Name, Name(s), Date of Birth (Y), Gender (f / m / d), Track (A / P), etc."
+      "IMPORTANT: Column names with spaces MUST be enclosed in square brackets in SQL queries",
+      "Example: SELECT [Last Name], Gender, Track FROM testlistAIA",
+      "Simple column names like Country, Gender, Track, Discipline, Comments do NOT need brackets",
+      "Always use [Column Name] syntax for: Last Name, Name(s), Present Position, Rating Katja, Rating Manuel, etc."
     ],
     "metrics": {
       "total_applicants": {
@@ -49,7 +49,7 @@
         "keywords": ["anzahl bewerber", "total applicants", "number of applications"]
       },
       "applicants_by_track": {
-        "formula": "COUNT(*) GROUP BY Track (A / P)",
+        "formula": "COUNT(*) GROUP BY Track",
         "description": "Number of applicants per track (Academic vs Professional)",
         "keywords": ["bewerber pro track", "academic vs professional", "track distribution"]
       },
@@ -59,17 +59,17 @@
         "keywords": ["bewerber pro land", "country distribution", "geographic origin"]
       },
       "average_fellowship_duration": {
-        "formula": "AVG(Duration in month)",
+        "formula": "AVG(Duration_Months)",
         "description": "Average fellowship duration in months",
         "keywords": ["durchschnittliche dauer", "average duration", "fellowship length"]
       },
       "rating_distribution": {
-        "formula": "COUNT(*) GROUP BY Rating Katja, Rating Manuel",
+        "formula": "COUNT(*) GROUP BY [Rating Katja], [Rating Manuel]",
         "description": "Distribution of ratings from reviewers",
         "keywords": ["bewertungsverteilung", "rating distribution", "grades"]
       },
       "gender_distribution": {
-        "formula": "COUNT(*) GROUP BY Gender (f / m / d)",
+        "formula": "COUNT(*) GROUP BY Gender",
         "description": "Distribution of applicants by gender",
         "keywords": ["geschlechterverteilung", "gender distribution", "diversity"]
       }
@@ -81,7 +81,7 @@
       },
       {
         "description": "Applicants by track (Academic vs Professional)",
-        "pattern": "SELECT [Track (A / P)] as track, COUNT(*) as count FROM testlistAIA GROUP BY [Track (A / P)] ORDER BY count DESC"
+        "pattern": "SELECT Track, COUNT(*) as count FROM testlistAIA GROUP BY Track ORDER BY count DESC"
       },
       {
         "description": "Top 5 countries by number of applicants",
@@ -89,7 +89,7 @@
       },
       {
         "description": "Average fellowship duration",
-        "pattern": "SELECT AVG([Duration in month]) as avg_duration_months FROM testlistAIA WHERE [Duration in month] IS NOT NULL"
+        "pattern": "SELECT AVG(Duration_Months) as avg_duration_months FROM testlistAIA WHERE Duration_Months IS NOT NULL"
       },
       {
         "description": "Applicants with highest ratings from both reviewers",
@@ -97,7 +97,7 @@
       },
       {
         "description": "Gender distribution",
-        "pattern": "SELECT [Gender (f / m / d)] as gender, COUNT(*) as count FROM testlistAIA GROUP BY [Gender (f / m / d)]"
+        "pattern": "SELECT Gender, COUNT(*) as count FROM testlistAIA GROUP BY Gender"
       },
       {
         "description": "Applicants by discipline",
@@ -109,13 +109,13 @@
       }
     ],
     "glossary": {
-      "Track (A / P)": "Application track: A = Academic (researchers with PhD), P = Professional (practitioners without PhD requirement)",
+      "Track": "Application track: A = Academic (researchers with PhD), P = Professional (practitioners without PhD requirement)",
+      "Gender": "Gender codes: f = female, m = male, d = diverse/non-binary",
       "Rating": "Assessment grade: A = Excellent, B = Good, C = Satisfactory, lower grades indicate concerns",
-      "Fellowship Duration": "Length of proposed fellowship in months, typically ranging from 3-12 months",
+      "Fellowship Duration": "Length of proposed fellowship in months (Duration_Months column), typically ranging from 3-12 months",
       "Home Institution": "The applicant's current affiliated organization (university, research center, company)",
       "Thematic relation": "How the proposed project connects to the fellowship program's focus areas",
-      "Advisory Board Reviewer": "Expert reviewers who assess applications",
-      "Gender": "f = female, m = male, d = diverse/non-binary"
+      "Advisory Board Reviewer": "Expert reviewers who assess applications"
     }
   }
 }
