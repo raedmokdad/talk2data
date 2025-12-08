@@ -8,6 +8,12 @@ Columns:
 IMPORTANT RULES:
 {schema_notes}
 
+CRITICAL SYNTAX RULE FOR DUCKDB:
+- Column names with spaces MUST use DOUBLE QUOTES: "Rating Katja", "Last Name"
+- Simple column names (no spaces) need NO quotes: Gender, Country, Track
+- NEVER use square brackets [Column Name] - this will cause syntax errors
+- Example: SELECT "Rating Katja", Country FROM table WHERE "Rating Katja" = 'A'
+
 SECURITY AND VALIDATION REQUIREMENTS:
 
 FORBIDDEN COMMANDS (will cause rejection):

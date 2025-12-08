@@ -6,30 +6,30 @@
         "role": "flat",
         "grain": "one row per applicant",
         "columns": {
-          "Last Name": "VARCHAR - Applicant's last name/surname. Use: [Last Name]",
-          "Name(s)": "VARCHAR - Applicant's first name(s). Use: [Name(s)]",
+          "Last Name": "VARCHAR - Applicant's last name/surname. Use: \"Last Name\"",
+          "Name(s)": "VARCHAR - Applicant's first name(s). Use: \"Name(s)\"",
           "Birth_Year": "INTEGER - Year of birth",
           "Country": "VARCHAR - Country of origin",
           "Gender": "VARCHAR - Gender (f=female, m=male, d=diverse)",
-          "Present Position": "VARCHAR - Current job position or role. Use: [Present Position]",
-          "Name of Home Institution": "VARCHAR - Name of applicant's home institution. Use: [Name of Home Institution]",
-          "Location of Home Institution": "VARCHAR - Geographic location of home institution. Use: [Location of Home Institution]",
-          "Contact E-Mail address": "VARCHAR - Email address for contact. Use: [Contact E-Mail address]",
+          "Present Position": "VARCHAR - Current job position or role. Use: \"Present Position\"",
+          "Name of Home Institution": "VARCHAR - Name of applicant's home institution. Use: \"Name of Home Institution\"",
+          "Location of Home Institution": "VARCHAR - Geographic location of home institution. Use: \"Location of Home Institution\"",
+          "Contact E-Mail address": "VARCHAR - Email address for contact. Use: \"Contact E-Mail address\"",
           "Track": "VARCHAR - Application track (A=Academic, P=Professional)",
-          "Academic Degree(s) (and / or Training)": "VARCHAR - Academic qualifications and degrees. Use: [Academic Degree(s) (and / or Training)]",
+          "Academic Degree(s) (and / or Training)": "VARCHAR - Academic qualifications and degrees. Use: \"Academic Degree(s) (and / or Training)\"",
           "PhD_Year": "INTEGER - Year when PhD was obtained",
           "Discipline": "VARCHAR - Academic or professional discipline",
-          "Title of proposed project": "VARCHAR - Title of the fellowship project proposal. Use: [Title of proposed project]",
-          "Thematic relation": "VARCHAR - How project relates to program themes. Use: [Thematic relation]",
-          "Begin of Fellowship": "DATE - Proposed fellowship start date. Use: [Begin of Fellowship]",
-          "End of Fellowship": "DATE - Proposed fellowship end date. Use: [End of Fellowship]",
+          "Title of proposed project": "VARCHAR - Title of the fellowship project proposal. Use: \"Title of proposed project\"",
+          "Thematic relation": "VARCHAR - How project relates to program themes. Use: \"Thematic relation\"",
+          "Begin of Fellowship": "DATE - Proposed fellowship start date. Use: \"Begin of Fellowship\"",
+          "End of Fellowship": "DATE - Proposed fellowship end date. Use: \"End of Fellowship\"",
           "Duration_Months": "INTEGER - Fellowship duration in months",
-          "Advisory Board Reviewer 1": "VARCHAR - Name of first advisory board reviewer. Use: [Advisory Board Reviewer 1]",
-          "Advisory Board Reviewer 2": "VARCHAR - Name of second advisory board reviewer. Use: [Advisory Board Reviewer 2]",
-          "Review Katja": "VARCHAR - Review comments from Katja. Use: [Review Katja]",
-          "Review Manuel": "VARCHAR - Review comments from Manuel. Use: [Review Manuel]",
-          "Rating Katja": "VARCHAR - Rating grade from Katja (A, B, C, etc.). Use: [Rating Katja]",
-          "Rating Manuel": "VARCHAR - Rating grade from Manuel (A, B, C, etc.). Use: [Rating Manuel]",
+          "Advisory Board Reviewer 1": "VARCHAR - Name of first advisory board reviewer. Use: \"Advisory Board Reviewer 1\"",
+          "Advisory Board Reviewer 2": "VARCHAR - Name of second advisory board reviewer. Use: \"Advisory Board Reviewer 2\"",
+          "Review Katja": "VARCHAR - Review comments from Katja. Use: \"Review Katja\"",
+          "Review Manuel": "VARCHAR - Review comments from Manuel. Use: \"Review Manuel\"",
+          "Rating Katja": "VARCHAR - Rating grade from Katja (A, B, C, etc.). Use: \"Rating Katja\"",
+          "Rating Manuel": "VARCHAR - Rating grade from Manuel (A, B, C, etc.). Use: \"Rating Manuel\"",
           "Comments": "VARCHAR - Additional comments or notes about the application"
         },
         "primary_key": "Contact E-Mail address"
@@ -37,10 +37,10 @@
     ],
     "relationships": [],
     "notes": [
-      "IMPORTANT: Column names with spaces MUST be enclosed in square brackets in SQL queries",
-      "Example: SELECT [Last Name], Gender, Track FROM testlistAIA",
-      "Simple column names like Country, Gender, Track, Discipline, Comments do NOT need brackets",
-      "Always use [Column Name] syntax for: Last Name, Name(s), Present Position, Rating Katja, Rating Manuel, etc."
+      "IMPORTANT: Column names with spaces MUST be enclosed in DOUBLE QUOTES in SQL queries for DuckDB",
+      "Example: SELECT \"Last Name\", Gender, Track FROM testlistAIA",
+      "Simple column names like Country, Gender, Track, Discipline, Comments do NOT need quotes",
+      "Always use \"Column Name\" syntax for: Last Name, Name(s), Present Position, Rating Katja, Rating Manuel, etc."
     ],
     "metrics": {
       "total_applicants": {
@@ -64,7 +64,7 @@
         "keywords": ["durchschnittliche dauer", "average duration", "fellowship length"]
       },
       "rating_distribution": {
-        "formula": "COUNT(*) GROUP BY [Rating Katja], [Rating Manuel]",
+        "formula": "COUNT(*) GROUP BY \"Rating Katja\", \"Rating Manuel\"",
         "description": "Distribution of ratings from reviewers",
         "keywords": ["bewertungsverteilung", "rating distribution", "grades"]
       },
@@ -93,7 +93,7 @@
       },
       {
         "description": "Applicants with highest ratings from both reviewers",
-        "pattern": "SELECT [Last Name], [Name(s)], Country, [Rating Katja], [Rating Manuel] FROM testlistAIA WHERE [Rating Katja] = 'A' AND [Rating Manuel] = 'A'"
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Country, \"Rating Katja\", \"Rating Manuel\" FROM testlistAIA WHERE \"Rating Katja\" = 'A' AND \"Rating Manuel\" = 'A'"
       },
       {
         "description": "Gender distribution",
@@ -105,7 +105,103 @@
       },
       {
         "description": "Fellowship applications starting in 2024",
-        "pattern": "SELECT [Last Name], [Name(s)], [Begin of Fellowship], [End of Fellowship] FROM testlistAIA WHERE [Begin of Fellowship] LIKE '%2024%'"
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", \"Begin of Fellowship\", \"End of Fellowship\" FROM testlistAIA WHERE \"Begin of Fellowship\" LIKE '%2024%'"
+      },
+      {
+        "description": "Applicants with Rating A from Katja",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Country, \"Rating Katja\" FROM testlistAIA WHERE \"Rating Katja\" = 'A'"
+      },
+      {
+        "description": "Applicants with Rating A from both reviewers",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Country, \"Rating Katja\", \"Rating Manuel\" FROM testlistAIA WHERE \"Rating Katja\" = 'A' AND \"Rating Manuel\" = 'A'"
+      },
+      {
+        "description": "Count applicants with Rating B or better",
+        "pattern": "SELECT COUNT(*) as count FROM testlistAIA WHERE \"Rating Katja\" IN ('A', 'B') OR \"Rating Manuel\" IN ('A', 'B')"
+      },
+      {
+        "description": "Average fellowship duration",
+        "pattern": "SELECT AVG(Duration_Months) as avg_duration FROM testlistAIA WHERE Duration_Months IS NOT NULL"
+      },
+      {
+        "description": "Applicants with longest fellowship duration",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Duration_Months FROM testlistAIA WHERE Duration_Months IS NOT NULL ORDER BY Duration_Months DESC LIMIT 5"
+      },
+      {
+        "description": "Fellowships over 10 months",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Country, Duration_Months FROM testlistAIA WHERE Duration_Months > 10"
+      },
+      {
+        "description": "Female applicants from Germany",
+        "pattern": "SELECT COUNT(*) as count FROM testlistAIA WHERE Country = 'Germany' AND Gender = 'f'"
+      },
+      {
+        "description": "Male applicants in Academic Track from Afghanistan",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Track, Gender FROM testlistAIA WHERE Track = 'A' AND Gender = 'm' AND Country = 'Afghanistan'"
+      },
+      {
+        "description": "German applicants with Rating A",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", \"Rating Katja\", \"Rating Manuel\" FROM testlistAIA WHERE Country = 'Germany' AND (\"Rating Katja\" = 'A' OR \"Rating Manuel\" = 'A')"
+      },
+      {
+        "description": "Applicants by country and gender",
+        "pattern": "SELECT Country, Gender, COUNT(*) as count FROM testlistAIA GROUP BY Country, Gender ORDER BY Country, Gender"
+      },
+      {
+        "description": "Academic Track applicants by country",
+        "pattern": "SELECT Country, COUNT(*) as count FROM testlistAIA WHERE Track = 'A' GROUP BY Country ORDER BY count DESC"
+      },
+      {
+        "description": "Applicants from specific countries (IN clause)",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Country FROM testlistAIA WHERE Country IN ('Germany', 'Afghanistan', 'Nigeria')"
+      },
+      {
+        "description": "Applicants with PhD after 2020",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", PhD_Year, Discipline FROM testlistAIA WHERE PhD_Year > 2020"
+      },
+      {
+        "description": "Count applicants by Track",
+        "pattern": "SELECT Track, COUNT(*) as total FROM testlistAIA GROUP BY Track"
+      },
+      {
+        "description": "Female applicants with their ratings",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", \"Rating Katja\", \"Rating Manuel\" FROM testlistAIA WHERE Gender = 'f'"
+      },
+      {
+        "description": "Applicants without specified Track",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Track FROM testlistAIA WHERE Track = 'not indicated' OR Track IS NULL"
+      },
+      {
+        "description": "Fellowship duration range 6-12 months",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Duration_Months FROM testlistAIA WHERE Duration_Months BETWEEN 6 AND 12"
+      },
+      {
+        "description": "Applicants with specific discipline",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Discipline, Country FROM testlistAIA WHERE Discipline LIKE '%Computer%' OR Discipline LIKE '%Engineering%'"
+      },
+      {
+        "description": "Top 10 applicants by duration",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", Duration_Months, Country FROM testlistAIA ORDER BY Duration_Months DESC LIMIT 10"
+      },
+      {
+        "description": "Applicants grouped by Track and Gender",
+        "pattern": "SELECT Track, Gender, COUNT(*) as count FROM testlistAIA GROUP BY Track, Gender"
+      },
+      {
+        "description": "Countries with more than 5 applicants",
+        "pattern": "SELECT Country, COUNT(*) as count FROM testlistAIA GROUP BY Country HAVING COUNT(*) > 5"
+      },
+      {
+        "description": "Applicants with different ratings from reviewers",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", \"Rating Katja\", \"Rating Manuel\" FROM testlistAIA WHERE \"Rating Katja\" != \"Rating Manuel\""
+      },
+      {
+        "description": "Professional Track applicants by gender",
+        "pattern": "SELECT Gender, COUNT(*) as count FROM testlistAIA WHERE Track = 'P' GROUP BY Gender"
+      },
+      {
+        "description": "Applicants with missing information",
+        "pattern": "SELECT \"Last Name\", \"Name(s)\", PhD_Year, Duration_Months FROM testlistAIA WHERE PhD_Year IS NULL OR Duration_Months IS NULL"
       }
     ],
     "glossary": {
