@@ -172,8 +172,10 @@ async def generate_sql(request: QueryRequest,  current_user: str = Depends(get_c
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error generating SQL: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"Error generating SQL: {e}\n{error_details}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e) or type(e).__name__}")
     
 @app.get("/schemas/{username}")
 async def listschemas(username: str, current_user: str = Depends(get_current_user)) -> SchemaListResponse:
