@@ -1,0 +1,115 @@
+{
+  "schema": {
+    "tables": [
+      {
+        "name": "testlistAIA",
+        "role": "flat",
+        "grain": "one row per applicant",
+        "columns": {
+          "Last Name": "VARCHAR - Applicant's last name/surname",
+          "Name(s)": "VARCHAR - Applicant's first name(s)",
+          "Date of Birth (Y)": "INTEGER - Year of birth",
+          "Country": "VARCHAR - Country of origin",
+          "Gender (f / m / d)": "VARCHAR - Gender (f=female, m=male, d=diverse)",
+          "Present Position": "VARCHAR - Current job position or role",
+          "Name of Home Institution": "VARCHAR - Name of applicant's home institution",
+          "Location of Home Institution": "VARCHAR - Geographic location of home institution",
+          "Contact E-Mail address": "VARCHAR - Email address for contact",
+          "Track (A / P)": "VARCHAR - Application track (A=Academic, P=Professional)",
+          "Academic Degree(s) (and / or Training)": "VARCHAR - Academic qualifications and degrees",
+          "Year of PhD": "INTEGER - Year when PhD was obtained",
+          "Discipline": "VARCHAR - Academic or professional discipline",
+          "Title of proposed project": "VARCHAR - Title of the fellowship project proposal",
+          "Thematic relation": "VARCHAR - How project relates to program themes",
+          "Begin of Fellowship": "DATE - Proposed fellowship start date",
+          "End of Fellowship": "DATE - Proposed fellowship end date",
+          "Duration in month": "INTEGER - Fellowship duration in months",
+          "Advisory Board Reviewer 1": "VARCHAR - Name of first advisory board reviewer",
+          "Advisory Board Reviewer 2": "VARCHAR - Name of second advisory board reviewer",
+          "Review Katja": "VARCHAR - Review comments from Katja",
+          "Review Manuel": "VARCHAR - Review comments from Manuel",
+          "Rating Katja": "VARCHAR - Rating grade from Katja (A, B, C, etc.)",
+          "Rating Manuel": "VARCHAR - Rating grade from Manuel (A, B, C, etc.)",
+          "Comments": "VARCHAR - Additional comments or notes about the application"
+        },
+        "primary_key": "Contact E-Mail address"
+      }
+    ],
+    "relationships": [],
+    "metrics": {
+      "total_applicants": {
+        "formula": "COUNT(*)",
+        "description": "Total number of applicants",
+        "keywords": ["anzahl bewerber", "total applicants", "number of applications"]
+      },
+      "applicants_by_track": {
+        "formula": "COUNT(*) GROUP BY Track (A / P)",
+        "description": "Number of applicants per track (Academic vs Professional)",
+        "keywords": ["bewerber pro track", "academic vs professional", "track distribution"]
+      },
+      "applicants_by_country": {
+        "formula": "COUNT(*) GROUP BY Country",
+        "description": "Number of applicants per country",
+        "keywords": ["bewerber pro land", "country distribution", "geographic origin"]
+      },
+      "average_fellowship_duration": {
+        "formula": "AVG(Duration in month)",
+        "description": "Average fellowship duration in months",
+        "keywords": ["durchschnittliche dauer", "average duration", "fellowship length"]
+      },
+      "rating_distribution": {
+        "formula": "COUNT(*) GROUP BY Rating Katja, Rating Manuel",
+        "description": "Distribution of ratings from reviewers",
+        "keywords": ["bewertungsverteilung", "rating distribution", "grades"]
+      },
+      "gender_distribution": {
+        "formula": "COUNT(*) GROUP BY Gender (f / m / d)",
+        "description": "Distribution of applicants by gender",
+        "keywords": ["geschlechterverteilung", "gender distribution", "diversity"]
+      }
+    },
+    "examples": [
+      {
+        "description": "Total number of applicants",
+        "pattern": "SELECT COUNT(*) as total_applicants FROM testlistAIA"
+      },
+      {
+        "description": "Applicants by track (Academic vs Professional)",
+        "pattern": "SELECT [Track (A / P)] as track, COUNT(*) as count FROM testlistAIA GROUP BY [Track (A / P)] ORDER BY count DESC"
+      },
+      {
+        "description": "Top 5 countries by number of applicants",
+        "pattern": "SELECT Country, COUNT(*) as applicant_count FROM testlistAIA GROUP BY Country ORDER BY applicant_count DESC LIMIT 5"
+      },
+      {
+        "description": "Average fellowship duration",
+        "pattern": "SELECT AVG([Duration in month]) as avg_duration_months FROM testlistAIA WHERE [Duration in month] IS NOT NULL"
+      },
+      {
+        "description": "Applicants with highest ratings from both reviewers",
+        "pattern": "SELECT [Last Name], [Name(s)], Country, [Rating Katja], [Rating Manuel] FROM testlistAIA WHERE [Rating Katja] = 'A' AND [Rating Manuel] = 'A'"
+      },
+      {
+        "description": "Gender distribution",
+        "pattern": "SELECT [Gender (f / m / d)] as gender, COUNT(*) as count FROM testlistAIA GROUP BY [Gender (f / m / d)]"
+      },
+      {
+        "description": "Applicants by discipline",
+        "pattern": "SELECT Discipline, COUNT(*) as count FROM testlistAIA GROUP BY Discipline ORDER BY count DESC"
+      },
+      {
+        "description": "Fellowship applications starting in 2024",
+        "pattern": "SELECT [Last Name], [Name(s)], [Begin of Fellowship], [End of Fellowship] FROM testlistAIA WHERE [Begin of Fellowship] LIKE '%2024%'"
+      }
+    ],
+    "glossary": {
+      "Track (A / P)": "Application track: A = Academic (researchers with PhD), P = Professional (practitioners without PhD requirement)",
+      "Rating": "Assessment grade: A = Excellent, B = Good, C = Satisfactory, lower grades indicate concerns",
+      "Fellowship Duration": "Length of proposed fellowship in months, typically ranging from 3-12 months",
+      "Home Institution": "The applicant's current affiliated organization (university, research center, company)",
+      "Thematic relation": "How the proposed project connects to the fellowship program's focus areas",
+      "Advisory Board Reviewer": "Expert reviewers who assess applications",
+      "Gender": "f = female, m = male, d = diverse/non-binary"
+    }
+  }
+}

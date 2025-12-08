@@ -68,7 +68,7 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
 if 'username' not in st.session_state:
-    st.session_state.username = "raedmokdad"  # Fixed: Set to match S3 username
+    st.session_state.username = "rmokdad"  # Fixed: Set to match S3 username
 
 if 'user_tokens' not in st.session_state:
     st.session_state.user_tokens = None
